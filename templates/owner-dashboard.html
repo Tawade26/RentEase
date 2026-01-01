@@ -1,0 +1,971 @@
+{% extends "base.html" %}
+
+{% block title %}Owner Dashboard - RentEase{% endblock %}
+
+{% block extra_css %}
+<style>
+    .metric-card {
+        transition: transform 0.2s;
+    }
+    .metric-card:hover {
+        transform: translateY(-5px);
+    }
+    .chart-container {
+        position: relative;
+        height: 300px;
+    }
+    .todo-item {
+        border-left: 4px solid #dee2e6;
+        transition: all 0.2s;
+    }
+    .todo-item.priority-high {
+        border-left-color: #dc3545;
+    }
+    .todo-item.priority-medium {
+        border-left-color: #ffc107;
+    }
+    .todo-item.priority-low {
+        border-left-color: #28a745;
+    }
+    .todo-item.completed {
+        opacity: 0.6;
+        text-decoration: line-through;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1 class="display-4">Owner Dashboard</h1>
+        <p class="lead text-muted">Manage your properties, bookings, and tenants</p>
+    </div>
+</div>
+
+<!-- Key Metrics Cards -->
+<div class="row mb-4" id="keyMetrics">
+    <div class="col-md-3 mb-3">
+        <div class="card text-center metric-card border-primary">
+            <div class="card-body">
+                <i class="bi bi-house-door text-primary" style="font-size: 2rem;"></i>
+                <h5 class="card-title mt-2">Total Properties</h5>
+                <h2 class="text-primary mb-0" id="metricProperties">-</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-center metric-card border-info">
+            <div class="card-body">
+                <i class="bi bi-door-open text-info" style="font-size: 2rem;"></i>
+                <h5 class="card-title mt-2">Occupancy Rate</h5>
+                <h2 class="text-info mb-0" id="metricOccupancy">-</h2>
+                <small class="text-muted" id="metricOccupancyDetail">-</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-center metric-card border-success">
+            <div class="card-body">
+                <i class="bi bi-people text-success" style="font-size: 2rem;"></i>
+                <h5 class="card-title mt-2">Active Tenants</h5>
+                <h2 class="text-success mb-0" id="metricTenants">-</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-center metric-card border-warning">
+            <div class="card-body">
+                <i class="bi bi-exclamation-triangle text-warning" style="font-size: 2rem;"></i>
+                <h5 class="card-title mt-2">Pending Actions</h5>
+                <h2 class="text-warning mb-0" id="metricPending">-</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabs -->
+<ul class="nav nav-tabs mb-4" id="dashboardTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview" type="button">
+            <i class="bi bi-speedometer2"></i> Overview
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="financial-tab" data-bs-toggle="tab" data-bs-target="#financial" type="button">
+            <i class="bi bi-graph-up"></i> Financial
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="properties-tab" data-bs-toggle="tab" data-bs-target="#properties" type="button">
+            <i class="bi bi-house-door"></i> Properties
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="bookings-tab" data-bs-toggle="tab" data-bs-target="#bookings" type="button">
+            <i class="bi bi-calendar-check"></i> Bookings
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="tenants-tab" data-bs-toggle="tab" data-bs-target="#tenants" type="button">
+            <i class="bi bi-people"></i> Tenants
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="todos-tab" data-bs-toggle="tab" data-bs-target="#todos" type="button">
+            <i class="bi bi-check-square"></i> To-Do List
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="chat-tab" data-bs-toggle="tab" data-bs-target="#chat" type="button">
+            <i class="bi bi-chat-dots"></i> AI Chat
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content" id="dashboardTabContent">
+    <!-- Overview Tab -->
+    <div class="tab-pane fade show active" id="overview" role="tabpanel">
+        <div class="row mb-4">
+            <div class="col-12">
+                <h3>Property Status Overview</h3>
+                <div class="table-responsive">
+                    <table class="table table-hover" id="propertyStatusTable">
+                        <thead>
+                            <tr>
+                                <th>Property</th>
+                                <th>Location</th>
+                                <th>Total Rooms</th>
+                                <th>Available</th>
+                                <th>Occupied</th>
+                                <th>Occupancy Rate</th>
+                                <th>Active Bookings</th>
+                                <th>Pending</th>
+                                <th>Avg Rating</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="propertyStatusTableBody">
+                            <tr>
+                                <td colspan="10" class="text-center">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Financial Overview Tab -->
+    <div class="tab-pane fade" id="financial" role="tabpanel">
+        <div class="row mb-4">
+            <div class="col-md-4 mb-3">
+                <div class="card text-center border-success">
+                    <div class="card-body">
+                        <h5 class="card-title">Total Revenue</h5>
+                        <h2 class="text-success" id="totalRevenue">₱0.00</h2>
+                        <small class="text-muted">From confirmed payments</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="card text-center border-info">
+                    <div class="card-body">
+                        <h5 class="card-title">Monthly Expected</h5>
+                        <h2 class="text-info" id="monthlyExpected">₱0.00</h2>
+                        <small class="text-muted">From active bookings</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="card text-center border-warning">
+                    <div class="card-body">
+                        <h5 class="card-title">Pending Payments</h5>
+                        <h2 class="text-warning" id="pendingPayments">₱0.00</h2>
+                        <small class="text-muted" id="pendingCount">0 pending</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mb-4">
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Monthly Revenue (Last 6 Months)</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="monthlyRevenueChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Revenue by Property</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="revenueByPropertyChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Properties Tab -->
+    <div class="tab-pane fade" id="properties" role="tabpanel">
+        <div class="row" id="propertiesContainer">
+            <div class="col-12 text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bookings Tab -->
+    <div class="tab-pane fade" id="bookings" role="tabpanel">
+        <div class="mb-3">
+            <select class="form-select" id="bookingFilter" onchange="filterBookings()">
+                <option value="all">All Bookings</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+                <option value="cancelled">Cancelled</option>
+                <option value="completed">Completed</option>
+            </select>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover" id="bookingsTable">
+                <thead>
+                    <tr>
+                        <th>Tenant</th>
+                        <th>Property</th>
+                        <th>Room Type</th>
+                        <th>Start Date</th>
+                        <th>End Date</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="bookingsTableBody">
+                    <tr>
+                        <td colspan="7" class="text-center">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+<!-- Tenants Tab -->
+    <div class="tab-pane fade" id="tenants" role="tabpanel">
+        <div class="row" id="tenantsContainer">
+            <div class="col-12 text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- To-Do List Tab -->
+    <div class="tab-pane fade" id="todos" role="tabpanel">
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-check-square"></i> To-Do List</h5>
+                        <button class="btn btn-sm btn-primary" onclick="showAddTodoModal()">
+                            <i class="bi bi-plus"></i> Add Task
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div id="todosContainer">
+                            <div class="text-center">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0">Quick Stats</h6>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Total Tasks:</strong> <span id="todoTotal">0</span></p>
+                        <p><strong>Completed:</strong> <span id="todoCompleted">0</span></p>
+                        <p><strong>Pending:</strong> <span id="todoPending">0</span></p>
+                        <hr>
+                        <p><strong>High Priority:</strong> <span id="todoHigh">0</span></p>
+                        <p><strong>Medium Priority:</strong> <span id="todoMedium">0</span></p>
+                        <p><strong>Low Priority:</strong> <span id="todoLow">0</span></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tenant AI Chat Tab -->
+    <div class="tab-pane fade" id="chat" role="tabpanel">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-robot"></i> Tenant Information Assistant</h5>
+                <small class="text-muted">Ask questions about your tenants</small>
+            </div>
+            <div class="card-body">
+                <div id="tenantChatMessages" style="height: 400px; overflow-y: auto; border: 1px solid #dee2e6; padding: 1rem; margin-bottom: 1rem; border-radius: 0.25rem;">
+                    <div class="message assistant">
+                        <strong>AI:</strong> Hello! I can help you understand your tenants' information, booking history, and statistics. What would you like to know?
+                    </div>
+                </div>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="tenantChatInput" placeholder="Ask about your tenants...">
+                    <button class="btn btn-primary" onclick="sendTenantChatMessage()">
+                        <i class="bi bi-send"></i> Send
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Todo Modal -->
+<div class="modal fade" id="todoModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="todoModalTitle">Add New Task</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="todoForm">
+                    <input type="hidden" id="todoId">
+                    <div class="mb-3">
+                        <label for="todoTitle" class="form-label">Title *</label>
+                        <input type="text" class="form-control" id="todoTitle" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="todoDescription" class="form-label">Description</label>
+                        <textarea class="form-control" id="todoDescription" rows="3"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="todoPriority" class="form-label">Priority</label>
+                        <select class="form-select" id="todoPriority">
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveTodo()">Save Task</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+    let allBookings = [];
+    let monthlyRevenueChart = null;
+    let revenueByPropertyChart = null;
+
+    async function loadDashboard() {
+        await Promise.all([
+            loadKeyMetrics(),
+            loadFinancialOverview(),
+            loadPropertyStatus(),
+            loadProperties(),
+            loadBookings(),
+            loadTenants(),
+            loadTodos()
+        ]);
+    }
+
+    async function loadKeyMetrics() {
+        try {
+            const response = await fetch('/api/owner/metrics');
+            const metrics = await response.json();
+            
+            document.getElementById('metricProperties').textContent = metrics.total_properties;
+            document.getElementById('metricOccupancy').textContent = metrics.occupancy_rate + '%';
+            document.getElementById('metricOccupancyDetail').textContent = 
+                `${metrics.occupied_rooms} / ${metrics.total_rooms} rooms`;
+            document.getElementById('metricTenants').textContent = metrics.total_tenants;
+            document.getElementById('metricPending').textContent = metrics.pending_bookings;
+        } catch (error) {
+            console.error('Error loading key metrics:', error);
+        }
+    }
+
+    async function loadFinancialOverview() {
+        try {
+            const response = await fetch('/api/owner/financial-overview');
+            const financial = await response.json();
+            
+            // Update financial cards
+            document.getElementById('totalRevenue').textContent = 
+                '₱' + financial.total_revenue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            document.getElementById('monthlyExpected').textContent = 
+                '₱' + financial.monthly_expected.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            document.getElementById('pendingPayments').textContent = 
+                '₱' + financial.pending_amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            document.getElementById('pendingCount').textContent = 
+                `${financial.pending_count} pending`;
+            
+            // Create monthly revenue chart
+            const monthlyCtx = document.getElementById('monthlyRevenueChart');
+            if (monthlyRevenueChart) {
+                monthlyRevenueChart.destroy();
+            }
+            
+            const monthlyLabels = financial.monthly_revenue.map(r => {
+                const [year, month] = r.month.split('-');
+                const date = new Date(year, month - 1);
+                return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+            });
+            const monthlyData = financial.monthly_revenue.map(r => parseFloat(r.revenue));
+            
+            monthlyRevenueChart = new Chart(monthlyCtx, {
+                type: 'line',
+                data: {
+                    labels: monthlyLabels,
+                    datasets: [{
+                        label: 'Revenue (₱)',
+                        data: monthlyData,
+                        borderColor: 'rgb(75, 192, 192)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return '₱' + value.toLocaleString();
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Create revenue by property chart
+            const propertyCtx = document.getElementById('revenueByPropertyChart');
+            if (revenueByPropertyChart) {
+                revenueByPropertyChart.destroy();
+            }
+            
+            const propertyLabels = financial.revenue_by_property.map(p => p.property_name);
+            const propertyData = financial.revenue_by_property.map(p => parseFloat(p.revenue));
+            
+            revenueByPropertyChart = new Chart(propertyCtx, {
+                type: 'bar',
+                data: {
+                    labels: propertyLabels,
+                    datasets: [{
+                        label: 'Revenue (₱)',
+                        data: propertyData,
+                        backgroundColor: [
+                            'rgba(54, 162, 235, 0.6)',
+                            'rgba(255, 99, 132, 0.6)',
+                            'rgba(255, 206, 86, 0.6)',
+                            'rgba(75, 192, 192, 0.6)',
+                            'rgba(153, 102, 255, 0.6)'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return '₱' + value.toLocaleString();
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        } catch (error) {
+            console.error('Error loading financial overview:', error);
+        }
+    }
+
+    async function loadPropertyStatus() {
+        try {
+            const response = await fetch('/api/owner/property-status');
+            const properties = await response.json();
+            
+            const tbody = document.getElementById('propertyStatusTableBody');
+            
+            if (properties.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" class="text-center">No properties found.</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = properties.map(prop => `
+                <tr>
+                    <td><strong>${escapeHtml(prop.property_name)}</strong></td>
+                    <td>${escapeHtml(prop.location)}</td>
+                    <td>${prop.total_rooms}</td>
+                    <td><span class="badge bg-success">${prop.available_rooms}</span></td>
+                    <td><span class="badge bg-info">${prop.occupied_rooms}</span></td>
+                    <td>
+                        <div class="progress" style="height: 20px;">
+                            <div class="progress-bar" role="progressbar" 
+                                 style="width: ${prop.occupancy_rate}%" 
+                                 aria-valuenow="${prop.occupancy_rate}" 
+                                 aria-valuemin="0" 
+                                 aria-valuemax="100">
+                                ${prop.occupancy_rate}%
+                            </div>
+                        </div>
+                    </td>
+                    <td><span class="badge bg-primary">${prop.active_bookings}</span></td>
+                    <td><span class="badge bg-warning">${prop.pending_bookings}</span></td>
+                    <td>
+                        ${prop.avg_rating > 0 ? `
+                            <span class="badge bg-success">${prop.avg_rating} ⭐</span>
+                            <small class="text-muted">(${prop.total_reviews} reviews)</small>
+                        ` : '<span class="text-muted">No reviews</span>'}
+                    </td>
+                    <td>
+                        <a href="/property/${prop.property_id}" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-eye"></i> View
+                        </a>
+                    </td>
+                </tr>
+            `).join('');
+        } catch (error) {
+            console.error('Error loading property status:', error);
+        }
+    }
+
+    async function loadProperties() {
+        try {
+            const response = await fetch('/api/owner/properties');
+            const properties = await response.json();
+            
+            const container = document.getElementById('propertiesContainer');
+            if (properties.length === 0) {
+                container.innerHTML = '<div class="alert alert-info">You don\'t have any properties yet.</div>';
+                return;
+            }
+
+            container.innerHTML = properties.map(property => `
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">${escapeHtml(property.property_name)}</h5>
+                            <p class="card-text text-muted">
+                                <i class="bi bi-geo-alt"></i> ${escapeHtml(property.location)}
+                            </p>
+                            <p class="card-text">${escapeHtml(property.description || '').substring(0, 100)}${property.description && property.description.length > 100 ? '...' : ''}</p>
+                            <div class="d-flex justify-content-between">
+                                <small class="text-muted">
+                                    <i class="bi bi-door-open"></i> ${property.available_rooms || 0} / ${property.total_rooms || 0} rooms
+                                </small>
+                                <small class="text-muted">
+                                    <i class="bi bi-calendar"></i> ${formatDate(property.date_posted)}
+                                </small>
+                            </div>
+                        </div>
+                        <div class="card-footer bg-transparent">
+                            <a href="/property/${property.property_id}" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-eye"></i> View Details
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            document.getElementById('totalProperties').textContent = properties.length;
+        } catch (error) {
+            console.error('Error loading properties:', error);
+        }
+    }
+
+    async function loadBookings() {
+        try {
+            const response = await fetch('/api/owner/bookings');
+            allBookings = await response.json();
+            displayBookings(allBookings);
+            updateStats();
+        } catch (error) {
+            console.error('Error loading bookings:', error);
+        }
+    }
+
+    function displayBookings(bookings) {
+        const tbody = document.getElementById('bookingsTableBody');
+        
+        if (bookings.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center">No bookings found.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = bookings.map(booking => `
+            <tr>
+                <td>
+                    <strong>${escapeHtml(booking.tenant_name)}</strong><br>
+                    <small class="text-muted">${escapeHtml(booking.tenant_email)}</small>
+                </td>
+                <td>${escapeHtml(booking.property_name)}</td>
+                <td><span class="badge bg-info">${escapeHtml(booking.room_type)}</span></td>
+                <td>${formatDate(booking.start_date)}</td>
+                <td>${booking.end_date ? formatDate(booking.end_date) : 'N/A'}</td>
+                <td><span class="badge bg-${getStatusColor(booking.status)}">${escapeHtml(booking.status)}</span></td>
+                <td>
+                    ${booking.status === 'pending' ? `
+                        <button class="btn btn-sm btn-success" onclick="updateBookingStatus(${booking.booking_id}, 'approved')">
+                            <i class="bi bi-check"></i> Approve
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="updateBookingStatus(${booking.booking_id}, 'rejected')">
+                            <i class="bi bi-x"></i> Reject
+                        </button>
+                    ` : '-'}
+                </td>
+            </tr>
+        `).join('');
+
+        document.getElementById('totalBookings').textContent = allBookings.length;
+        document.getElementById('pendingBookings').textContent = allBookings.filter(b => b.status === 'pending').length;
+    }
+
+    function filterBookings() {
+        const filter = document.getElementById('bookingFilter').value;
+        if (filter === 'all') {
+            displayBookings(allBookings);
+        } else {
+            const filtered = allBookings.filter(b => b.status === filter);
+            displayBookings(filtered);
+        }
+    }
+
+    async function updateBookingStatus(bookingId, status) {
+        // TODO: Implement booking status update endpoint
+        alert(`Booking status update functionality coming soon! Would update booking ${bookingId} to ${status}`);
+    }
+
+    async function loadTenants() {
+        try {
+            const response = await fetch('/api/owner/tenants');
+            const tenants = await response.json();
+            
+            const container = document.getElementById('tenantsContainer');
+            if (tenants.length === 0) {
+                container.innerHTML = '<div class="alert alert-info">You don\'t have any tenants yet.</div>';
+                return;
+            }
+
+            container.innerHTML = tenants.map(tenant => `
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">${escapeHtml(tenant.full_name)}</h5>
+                            <p class="card-text">
+                                <i class="bi bi-envelope"></i> ${escapeHtml(tenant.email)}<br>
+                                <i class="bi bi-telephone"></i> ${escapeHtml(tenant.phone_number || 'N/A')}
+                            </p>
+                            <hr>
+                            <p class="card-text small">
+                                <strong>Total Bookings:</strong> ${tenant.total_bookings || 0}<br>
+                                <strong>Active Bookings:</strong> ${tenant.active_bookings || 0}<br>
+                                <strong>Properties:</strong> ${escapeHtml(tenant.properties_rented || 'None')}<br>
+                                <strong>Room Types:</strong> ${escapeHtml(tenant.room_types || 'N/A')}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            document.getElementById('totalTenants').textContent = tenants.length;
+        } catch (error) {
+            console.error('Error loading tenants:', error);
+        }
+    }
+
+    // To-Do List Functions
+    async function loadTodos() {
+        try {
+            const response = await fetch('/api/owner/todos');
+            const todos = await response.json();
+            displayTodos(todos);
+        } catch (error) {
+            console.error('Error loading todos:', error);
+        }
+    }
+
+    function displayTodos(todos) {
+        const container = document.getElementById('todosContainer');
+        
+        if (todos.length === 0) {
+            container.innerHTML = '<div class="alert alert-info">No tasks yet. Click "Add Task" to create one!</div>';
+            updateTodoStats(todos);
+            return;
+        }
+        
+        // Sort: incomplete first, then by priority
+        const sortedTodos = [...todos].sort((a, b) => {
+            if (a.completed !== b.completed) return a.completed ? 1 : -1;
+            const priorityOrder = { high: 3, medium: 2, low: 1 };
+            return priorityOrder[b.priority] - priorityOrder[a.priority];
+        });
+        
+        container.innerHTML = sortedTodos.map(todo => `
+            <div class="card mb-2 todo-item priority-${todo.priority} ${todo.completed ? 'completed' : ''}" id="todo-${todo.id}">
+                <div class="card-body">
+                    <div class="form-check d-flex align-items-start">
+                        <input class="form-check-input mt-1" type="checkbox" 
+                               ${todo.completed ? 'checked' : ''} 
+                               onchange="toggleTodo(${todo.id}, this.checked)">
+                        <div class="flex-grow-1 ms-2">
+                            <h6 class="mb-1 ${todo.completed ? 'text-muted' : ''}">${escapeHtml(todo.title)}</h6>
+                            ${todo.description ? `<p class="mb-1 small text-muted">${escapeHtml(todo.description)}</p>` : ''}
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="badge bg-${getPriorityColor(todo.priority)}">${todo.priority}</span>
+                                <div>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="editTodo(${todo.id})">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" onclick="deleteTodo(${todo.id})">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+        
+        updateTodoStats(todos);
+    }
+
+    function updateTodoStats(todos) {
+        const total = todos.length;
+        const completed = todos.filter(t => t.completed).length;
+        const pending = total - completed;
+        const high = todos.filter(t => t.priority === 'high' && !t.completed).length;
+        const medium = todos.filter(t => t.priority === 'medium' && !t.completed).length;
+        const low = todos.filter(t => t.priority === 'low' && !t.completed).length;
+        
+        document.getElementById('todoTotal').textContent = total;
+        document.getElementById('todoCompleted').textContent = completed;
+        document.getElementById('todoPending').textContent = pending;
+        document.getElementById('todoHigh').textContent = high;
+        document.getElementById('todoMedium').textContent = medium;
+        document.getElementById('todoLow').textContent = low;
+    }
+
+    function getPriorityColor(priority) {
+        const colors = { high: 'danger', medium: 'warning', low: 'success' };
+        return colors[priority] || 'secondary';
+    }
+
+    function showAddTodoModal() {
+        document.getElementById('todoModalTitle').textContent = 'Add New Task';
+        document.getElementById('todoForm').reset();
+        document.getElementById('todoId').value = '';
+        new bootstrap.Modal(document.getElementById('todoModal')).show();
+    }
+
+    function editTodo(todoId) {
+        fetch('/api/owner/todos')
+            .then(res => res.json())
+            .then(todos => {
+                const todo = todos.find(t => t.id === todoId);
+                if (todo) {
+                    document.getElementById('todoModalTitle').textContent = 'Edit Task';
+                    document.getElementById('todoId').value = todo.id;
+                    document.getElementById('todoTitle').value = todo.title;
+                    document.getElementById('todoDescription').value = todo.description || '';
+                    document.getElementById('todoPriority').value = todo.priority;
+                    new bootstrap.Modal(document.getElementById('todoModal')).show();
+                }
+            });
+    }
+
+    async function saveTodo() {
+        const todoId = document.getElementById('todoId').value;
+        const title = document.getElementById('todoTitle').value;
+        const description = document.getElementById('todoDescription').value;
+        const priority = document.getElementById('todoPriority').value;
+        
+        if (!title.trim()) {
+            alert('Title is required');
+            return;
+        }
+        
+        try {
+            const url = todoId ? `/api/owner/todos/${todoId}` : '/api/owner/todos';
+            const method = todoId ? 'PUT' : 'POST';
+            const body = todoId ? 
+                { title, description, priority } : 
+                { title, description, priority };
+            
+            const response = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            
+            if (response.ok) {
+                bootstrap.Modal.getInstance(document.getElementById('todoModal')).hide();
+                loadTodos();
+            } else {
+                const error = await response.json();
+                alert('Error: ' + (error.error || 'Failed to save task'));
+            }
+        } catch (error) {
+            console.error('Error saving todo:', error);
+            alert('Error saving task');
+        }
+    }
+
+    async function toggleTodo(todoId, completed) {
+        try {
+            const response = await fetch(`/api/owner/todos/${todoId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ completed })
+            });
+            
+            if (response.ok) {
+                loadTodos();
+            }
+        } catch (error) {
+            console.error('Error toggling todo:', error);
+        }
+    }
+
+    async function deleteTodo(todoId) {
+        if (!confirm('Are you sure you want to delete this task?')) return;
+        
+        try {
+            const response = await fetch(`/api/owner/todos/${todoId}`, {
+                method: 'DELETE'
+            });
+            
+            if (response.ok) {
+                loadTodos();
+            }
+        } catch (error) {
+            console.error('Error deleting todo:', error);
+        }
+    }
+
+    async function sendTenantChatMessage() {
+        const input = document.getElementById('tenantChatInput');
+        const message = input.value.trim();
+        if (!message) return;
+
+        const messagesDiv = document.getElementById('tenantChatMessages');
+        
+        // Add user message
+        const userMsg = document.createElement('div');
+        userMsg.className = 'message user';
+        userMsg.innerHTML = `<strong>You:</strong> ${escapeHtml(message)}`;
+        messagesDiv.appendChild(userMsg);
+        
+        input.value = '';
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+        // Send to API
+        try {
+            const response = await fetch('/api/owner/tenant-chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ message: message })
+            });
+            
+            const data = await response.json();
+            
+            const aiMsg = document.createElement('div');
+            aiMsg.className = 'message assistant';
+            aiMsg.innerHTML = `<strong>AI:</strong> ${escapeHtml(data.response || data.error || 'Sorry, I encountered an error.')}`;
+            messagesDiv.appendChild(aiMsg);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        } catch (error) {
+            const aiMsg = document.createElement('div');
+            aiMsg.className = 'message assistant';
+            aiMsg.innerHTML = `<strong>AI:</strong> Sorry, I encountered an error. Please try again.`;
+            messagesDiv.appendChild(aiMsg);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+    }
+
+    document.getElementById('tenantChatInput')?.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            sendTenantChatMessage();
+        }
+    });
+
+    function getStatusColor(status) {
+        const colors = {
+            'pending': 'warning',
+            'approved': 'success',
+            'rejected': 'danger',
+            'cancelled': 'secondary',
+            'completed': 'info'
+        };
+        return colors[status] || 'secondary';
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function formatDate(dateString) {
+        if (!dateString) return 'N/A';
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    }
+
+    // Load dashboard on page load
+    loadDashboard();
+</script>
+{% endblock %}
+

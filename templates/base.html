@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}RentEase{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        :root {
+            --primary-color: #4a90e2;
+            --secondary-color: #50c878;
+            --danger-color: #e74c3c;
+            --dark-color: #2c3e50;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+        }
+        .navbar {
+            background: linear-gradient(135deg, var(--primary-color), #357abd);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .navbar-brand {
+            font-weight: bold;
+            font-size: 1.5rem;
+        }
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        .btn-primary:hover {
+            background-color: #357abd;
+            border-color: #357abd;
+        }
+        .card {
+            border: none;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .property-card {
+            cursor: pointer;
+            height: 100%;
+        }
+        .chat-sidebar {
+            position: fixed;
+            right: -400px;
+            top: 0;
+            width: 400px;
+            height: 100vh;
+            background: white;
+            box-shadow: -2px 0 10px rgba(0,0,0,0.1);
+            transition: right 0.3s ease;
+            z-index: 1000;
+        }
+        .chat-sidebar.open {
+            right: 0;
+        }
+        .chat-header {
+            background: var(--primary-color);
+            color: white;
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .chat-messages {
+            height: calc(100vh - 150px);
+            overflow-y: auto;
+            padding: 1rem;
+        }
+        .chat-input-area {
+            padding: 1rem;
+            border-top: 1px solid #dee2e6;
+        }
+        .message {
+            margin-bottom: 1rem;
+            padding: 0.75rem;
+            border-radius: 8px;
+        }
+        .message.user {
+            background-color: #e3f2fd;
+            margin-left: 20%;
+        }
+        .message.assistant {
+            background-color: #f5f5f5;
+            margin-right: 20%;
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="bi bi-house-door"></i> RentEase
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/browse">Browse Properties</a>
+                    </li>
+                    {% if session.logged_in and session.role == 'owner' %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="/owner-dashboard">Dashboard</a>
+                    </li>
+                    {% endif %}
+                </ul>
+                <ul class="navbar-nav">
+                    {% if session.logged_in %}
+                    <li class="nav-item">
+                        <span class="navbar-text me-3">Hello, {{ session.full_name }}</span>
+                    </li>
+                    <li class="nav-item">
+                        <button class="btn btn-outline-light btn-sm" onclick="logout()">Logout</button>
+                    </li>
+                    {% else %}
+                    <li class="nav-item">
+                        <a class="btn btn-outline-light btn-sm" href="/login">Sign In</a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container my-4">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- AI Chat Sidebar -->
+    <div class="chat-sidebar" id="chatSidebar">
+        <div class="chat-header">
+            <h5 class="mb-0"><i class="bi bi-robot"></i> AI Assistant</h5>
+            <button class="btn btn-sm btn-light" onclick="toggleChat()">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        <div class="chat-messages" id="chatMessages">
+            <div class="message assistant">
+                <strong>AI:</strong> Hello! I'm your RentEase AI assistant. How can I help you find the perfect rental property?
+            </div>
+        </div>
+        <div class="chat-input-area">
+            <div class="input-group">
+                <input type="text" class="form-control" id="chatInput" placeholder="Ask about properties...">
+                <button class="btn btn-primary" onclick="sendChatMessage()">
+                    <i class="bi bi-send"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chat Toggle Button -->
+    <button class="btn btn-primary rounded-circle position-fixed" 
+            style="bottom: 20px; right: 20px; width: 60px; height: 60px; z-index: 999;"
+            onclick="toggleChat()">
+        <i class="bi bi-chat-dots" style="font-size: 1.5rem;"></i>
+    </button>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Chat functionality
+        function toggleChat() {
+            const sidebar = document.getElementById('chatSidebar');
+            sidebar.classList.toggle('open');
+        }
+
+        function sendChatMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            if (!message) return;
+
+            const messagesDiv = document.getElementById('chatMessages');
+            
+            // Add user message
+            const userMsg = document.createElement('div');
+            userMsg.className = 'message user';
+            userMsg.innerHTML = `<strong>You:</strong> ${message}`;
+            messagesDiv.appendChild(userMsg);
+            
+            input.value = '';
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+            // Send to API
+            fetch('/api/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ message: message })
+            })
+            .then(response => response.json())
+            .then(data => {
+                const aiMsg = document.createElement('div');
+                aiMsg.className = 'message assistant';
+                aiMsg.innerHTML = `<strong>AI:</strong> ${data.response || data.error || 'Sorry, I encountered an error.'}`;
+                messagesDiv.appendChild(aiMsg);
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            })
+            .catch(error => {
+                const aiMsg = document.createElement('div');
+                aiMsg.className = 'message assistant';
+                aiMsg.innerHTML = `<strong>AI:</strong> Sorry, I encountered an error. Please try again.`;
+                messagesDiv.appendChild(aiMsg);
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            });
+        }
+
+        // Enter key support
+        document.getElementById('chatInput')?.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendChatMessage();
+            }
+        });
+
+        // Logout function
+        async function logout() {
+            try {
+                const response = await fetch('/api/logout', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                if (data.success) {
+                    window.location.href = '/browse';
+                }
+            } catch (error) {
+                console.error('Logout error:', error);
+            }
+        }
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
+

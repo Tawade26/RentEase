@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+
+{% block title %}Property Details - RentEase{% endblock %}
+
+{% block content %}
+<div id="propertyDetails">
+    <div class="text-center">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const propertyId = {{ property_id }};
+    let isLoggedIn = false;
+
+    async function checkLoginStatus() {
+        try {
+            const response = await fetch('/api/user-status');
+            const data = await response.json();
+            isLoggedIn = data.logged_in;
+        } catch (error) {
+            console.error('Error checking login status:', error);
+        }
+    }
+
+    async function loadPropertyDetails() {
+        try {
+            const [propertyRes, roomsRes, amenitiesRes, imagesRes] = await Promise.all([
+                fetch(`/api/properties/${propertyId}`),
+                fetch(`/api/properties/${propertyId}/rooms`),
+                fetch(`/api/properties/${propertyId}/amenities`),
+                fetch(`/api/properties/${propertyId}/images`)
+            ]);
+
+            const property = await propertyRes.json();
+            const rooms = await roomsRes.json();
+            const amenities = await amenitiesRes.json();
+            const images = await imagesRes.json();
+
+            if (propertyRes.status === 404) {
+                document.getElementById('propertyDetails').innerHTML = 
+                    '<div class="alert alert-danger">Property not found.</div>';
+                return;
+            }
+
+            displayPropertyDetails(property, rooms, amenities, images);
+        } catch (error) {
+            console.error('Error loading property details:', error);
+            document.getElementById('propertyDetails').innerHTML = 
+                '<div class="alert alert-danger">Error loading property details. Please try again later.</div>';
+        }
+    }
+
+    function displayPropertyDetails(property, rooms, amenities, images) {
+        const container = document.getElementById('propertyDetails');
+        
+        container.innerHTML = `
+            <div class="row mb-4">
+                <div class="col-12">
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item"><a href="/browse">Browse</a></li>
+                            <li class="breadcrumb-item active">${escapeHtml(property.property_name)}</li>
+                        </ol>
+                    </nav>
+                </div>
+            </div>
+
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-body">
+                            <h1 class="display-5 mb-3">${escapeHtml(property.property_name)}</h1>
+                            <p class="lead text-muted">
+                                <i class="bi bi-geo-alt"></i> ${escapeHtml(property.location)}
+                            </p>
+                            <p class="mb-3">${escapeHtml(property.description || 'No description available.')}</p>
+                            
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <p><strong>Owner:</strong> ${escapeHtml(property.owner_name || 'N/A')}</p>
+                                    <p><strong>Email:</strong> ${escapeHtml(property.owner_email || 'N/A')}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p><strong>Phone:</strong> ${escapeHtml(property.owner_phone || 'N/A')}</p>
+                                    <p><strong>Available Rooms:</strong> ${property.available_rooms || 0}</p>
+                                </div>
+                            </div>
+
+                            ${amenities.length > 0 ? `
+                                <div class="mb-3">
+                                    <h5>Amenities</h5>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        ${amenities.map(amenity => `
+                                            <span class="badge bg-primary">
+                                                <i class="bi bi-check-circle"></i> ${escapeHtml(amenity)}
+                                            </span>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mb-4">
+                <div class="col-12">
+                    <h3 class="mb-3">Available Rooms</h3>
+                    ${rooms.length > 0 ? `
+                        <div class="row">
+                            ${rooms.map(room => `
+                                <div class="col-md-6 mb-4">
+                                    <div class="card h-100">
+                                        <div class="card-body">
+                                            <h5 class="card-title">
+                                                ${escapeHtml(room.room_type)} Room
+                                                <span class="badge bg-${room.available_tenants > 0 ? 'success' : 'secondary'}">
+                                                    ${room.available_tenants} available
+                                                </span>
+                                            </h5>
+                                            <p class="card-text">
+                                                <strong>Monthly Rate:</strong> ₱${parseFloat(room.monthly_rate).toLocaleString()}
+                                            </p>
+                                            <p class="card-text">
+                                                <strong>Capacity:</strong> ${room.current_tenants}/${room.total_tenants} tenants
+                                            </p>
+                                            ${room.description ? `<p class="card-text text-muted">${escapeHtml(room.description)}</p>` : ''}
+                                            ${room.house_rules ? `
+                                                <div class="mt-2">
+                                                    <strong>House Rules:</strong>
+                                                    <p class="text-muted small">${escapeHtml(room.house_rules)}</p>
+                                                </div>
+                                            ` : ''}
+                                        </div>
+                                        <div class="card-footer bg-transparent">
+                                            ${room.available_tenants > 0 ? `
+                                                <button class="btn btn-primary w-100" onclick="bookRoom(${room.room_id})">
+                                                    <i class="bi bi-calendar-check"></i> Book Room
+                                                </button>
+                                            ` : `
+                                                <button class="btn btn-secondary w-100" disabled>
+                                                    <i class="bi bi-x-circle"></i> Fully Booked
+                                                </button>
+                                            `}
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : `
+                        <div class="alert alert-info">No rooms available for this property.</div>
+                    `}
+                </div>
+            </div>
+        `;
+    }
+
+    function bookRoom(roomId) {
+        if (!isLoggedIn) {
+            if (confirm('You need to login to book a room. Would you like to go to the login page?')) {
+                window.location.href = '/login';
+            }
+            return;
+        }
+        alert('Booking functionality is coming soon! This would create a booking request.');
+        // TODO: Implement booking form/modal
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Initialize
+    checkLoginStatus();
+    loadPropertyDetails();
+</script>
+{% endblock %}
+

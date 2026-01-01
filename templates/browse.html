@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}Browse Properties - RentEase{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1 class="display-4 mb-3">Find Your Perfect Rental</h1>
+        <p class="lead text-muted">Browse available properties and rooms</p>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="input-group input-group-lg">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input type="text" class="form-control" id="searchInput" placeholder="Search by property name or location...">
+        </div>
+    </div>
+</div>
+
+<div class="row" id="propertiesContainer">
+    <div class="col-12 text-center">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let allProperties = [];
+
+    async function loadProperties() {
+        try {
+            const response = await fetch('/api/properties');
+            const properties = await response.json();
+            allProperties = properties;
+            displayProperties(properties);
+        } catch (error) {
+            console.error('Error loading properties:', error);
+            document.getElementById('propertiesContainer').innerHTML = 
+                '<div class="alert alert-danger">Error loading properties. Please try again later.</div>';
+        }
+    }
+
+    function displayProperties(properties) {
+        const container = document.getElementById('propertiesContainer');
+        
+        if (properties.length === 0) {
+            container.innerHTML = '<div class="alert alert-info">No properties found.</div>';
+            return;
+        }
+
+        container.innerHTML = properties.map(property => `
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card property-card h-100" onclick="viewProperty(${property.property_id})">
+                    <div class="card-img-top bg-secondary d-flex align-items-center justify-content-center" 
+                         style="height: 200px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                        <i class="bi bi-house-door text-white" style="font-size: 4rem;"></i>
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title">${escapeHtml(property.property_name)}</h5>
+                        <p class="card-text text-muted">
+                            <i class="bi bi-geo-alt"></i> ${escapeHtml(property.location)}
+                        </p>
+                        <p class="card-text">${escapeHtml(property.description || '').substring(0, 100)}${property.description && property.description.length > 100 ? '...' : ''}</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted">
+                                <i class="bi bi-door-open"></i> ${property.available_rooms || 0} rooms available
+                            </small>
+                            <small class="text-muted">
+                                <i class="bi bi-person"></i> ${escapeHtml(property.owner_name || 'Owner')}
+                            </small>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-transparent">
+                        <small class="text-muted">
+                            <i class="bi bi-calendar"></i> Posted ${formatDate(property.date_posted)}
+                        </small>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function viewProperty(propertyId) {
+        window.location.href = `/property/${propertyId}`;
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function formatDate(dateString) {
+        if (!dateString) return '';
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    }
+
+    // Search functionality
+    document.getElementById('searchInput').addEventListener('input', function(e) {
+        const searchTerm = e.target.value.toLowerCase();
+        const filtered = allProperties.filter(property => 
+            property.property_name.toLowerCase().includes(searchTerm) ||
+            property.location.toLowerCase().includes(searchTerm) ||
+            (property.description && property.description.toLowerCase().includes(searchTerm))
+        );
+        displayProperties(filtered);
+    });
+
+    // Load properties on page load
+    loadProperties();
+</script>
+{% endblock %}
+

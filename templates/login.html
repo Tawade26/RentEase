@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Login - RentEase{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-5 col-lg-4">
+        <div class="card shadow">
+            <div class="card-body p-5">
+                <h2 class="card-title text-center mb-4">Sign In</h2>
+                
+                <div id="errorAlert" class="alert alert-danger d-none" role="alert"></div>
+                
+                <form id="loginForm">
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="email" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Password</label>
+                        <input type="password" class="form-control" id="password" required>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100 mb-3">
+                        <i class="bi bi-box-arrow-in-right"></i> Sign In
+                    </button>
+                </form>
+                
+                <div class="text-center">
+                    <p class="text-muted small">
+                        Don't have an account? <a href="/browse">Browse as guest</a>
+                    </p>
+                </div>
+                
+                <hr class="my-4">
+                
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <h6 class="card-title">Demo Accounts</h6>
+                        <small class="text-muted">
+                            <strong>Owner:</strong> maria.santos@rentease.com / owner123<br>
+                            <strong>Tenant:</strong> kevin.mendoza@student.com / tenant123
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.getElementById('loginForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        const errorAlert = document.getElementById('errorAlert');
+        
+        errorAlert.classList.add('d-none');
+        
+        try {
+            const response = await fetch('/api/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ email, password })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok && data.success) {
+                // Redirect based on role
+                if (data.user.role === 'owner') {
+                    window.location.href = '/owner-dashboard';
+                } else {
+                    window.location.href = '/browse';
+                }
+            } else {
+                errorAlert.textContent = data.error || 'Invalid credentials';
+                errorAlert.classList.remove('d-none');
+            }
+        } catch (error) {
+            errorAlert.textContent = 'An error occurred. Please try again.';
+            errorAlert.classList.remove('d-none');
+        }
+    });
+</script>
+{% endblock %}
+
