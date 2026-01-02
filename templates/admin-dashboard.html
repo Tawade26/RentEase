@@ -1,0 +1,461 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard - RentEase{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1 class="display-4">Admin Dashboard</h1>
+        <p class="lead text-muted">Manage user approvals and role changes</p>
+    </div>
+</div>
+
+<!-- Stats Cards -->
+<div class="row mb-4" id="adminStats">
+    <div class="col-md-3 mb-3">
+        <div class="card text-center border-warning">
+            <div class="card-body">
+                <h5 class="card-title">Pending Users</h5>
+                <h2 class="text-warning" id="pendingUsers">-</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-center border-info">
+            <div class="card-body">
+                <h5 class="card-title">Role Requests</h5>
+                <h2 class="text-info" id="roleRequests">-</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-center border-primary">
+            <div class="card-body">
+                <h5 class="card-title">Total Users</h5>
+                <h2 class="text-primary" id="totalUsers">-</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-center border-success">
+            <div class="card-body">
+                <h5 class="card-title">Approved Users</h5>
+                <h2 class="text-success" id="approvedUsers">-</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabs -->
+<ul class="nav nav-tabs mb-4" id="adminTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="pending-users-tab" data-bs-toggle="tab" data-bs-target="#pending-users" type="button">
+            <i class="bi bi-people"></i> Pending Users
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="pending-properties-tab" data-bs-toggle="tab" data-bs-target="#pending-properties" type="button">
+            <i class="bi bi-house-door"></i> Pending Properties
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="role-requests-tab" data-bs-toggle="tab" data-bs-target="#role-requests" type="button">
+            <i class="bi bi-arrow-repeat"></i> Role Change Requests
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content" id="adminTabContent">
+    <!-- Pending Users Tab -->
+    <div class="tab-pane fade show active" id="pending-users" role="tabpanel">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Pending User Registrations</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Phone</th>
+                                <th>Role</th>
+                                <th>Registered</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pendingUsersTable">
+                            <tr>
+                                <td colspan="6" class="text-center">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pending Properties Tab -->
+    <div class="tab-pane fade" id="pending-properties" role="tabpanel">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Pending Property Approvals</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Property Name</th>
+                                <th>Location</th>
+                                <th>Owner</th>
+                                <th>Rooms</th>
+                                <th>Submitted</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pendingPropertiesTable">
+                            <tr>
+                                <td colspan="6" class="text-center">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Role Change Requests Tab -->
+    <div class="tab-pane fade" id="role-requests" role="tabpanel">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Role Change Requests</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Current Role</th>
+                                <th>Requested Role</th>
+                                <th>Registered</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="roleRequestsTable">
+                            <tr>
+                                <td colspan="6" class="text-center">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    async function loadAdminDashboard() {
+        await Promise.all([
+            loadAdminStats(),
+            loadPendingUsers(),
+            loadPendingProperties(),
+            loadRoleChangeRequests()
+        ]);
+    }
+
+    async function loadAdminStats() {
+        try {
+            const response = await fetch('/api/admin/stats');
+            const stats = await response.json();
+            
+            document.getElementById('pendingUsers').textContent = stats.pending_users;
+            document.getElementById('roleRequests').textContent = stats.role_requests;
+            document.getElementById('totalUsers').textContent = stats.total_users;
+            
+            const approved = stats.users_by_role.reduce((sum, r) => sum + r.count, 0);
+            document.getElementById('approvedUsers').textContent = approved;
+            
+            // Update additional stats
+            if (stats.pending_properties !== undefined) {
+                document.getElementById('pendingPropertiesCount').textContent = stats.pending_properties;
+            }
+            document.getElementById('roleRequestsCount').textContent = stats.role_requests;
+            document.getElementById('totalUsersCount').textContent = stats.total_users;
+        } catch (error) {
+            console.error('Error loading admin stats:', error);
+        }
+    }
+
+    async function loadPendingUsers() {
+        try {
+            const response = await fetch('/api/admin/pending-users');
+            const users = await response.json();
+            
+            const tbody = document.getElementById('pendingUsersTable');
+            
+            if (users.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center">No pending users.</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = users.map(user => `
+                <tr>
+                    <td><strong>${escapeHtml(user.full_name)}</strong></td>
+                    <td>${escapeHtml(user.email)}</td>
+                    <td>${escapeHtml(user.phone_number || 'N/A')}</td>
+                    <td><span class="badge bg-info">${escapeHtml(user.role)}</span></td>
+                    <td>${formatDate(user.date_registered)}</td>
+                    <td>
+                        <button class="btn btn-sm btn-success" onclick="approveUser(${user.user_id})">
+                            <i class="bi bi-check-circle"></i> Approve
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="rejectUser(${user.user_id})">
+                            <i class="bi bi-x-circle"></i> Reject
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        } catch (error) {
+            console.error('Error loading pending users:', error);
+        }
+    }
+
+    async function loadRoleChangeRequests() {
+        try {
+            const response = await fetch('/api/admin/role-change-requests');
+            const requests = await response.json();
+            
+            const tbody = document.getElementById('roleRequestsTable');
+            
+            if (requests.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center">No role change requests.</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = requests.map(req => `
+                <tr>
+                    <td><strong>${escapeHtml(req.full_name)}</strong></td>
+                    <td>${escapeHtml(req.email)}</td>
+                    <td><span class="badge bg-secondary">${escapeHtml(req.role)}</span></td>
+                    <td><span class="badge bg-primary">${escapeHtml(req.role_change_request)}</span></td>
+                    <td>${formatDate(req.date_registered)}</td>
+                    <td>
+                        <button class="btn btn-sm btn-success" onclick="approveRoleChange(${req.user_id})">
+                            <i class="bi bi-check-circle"></i> Approve
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="rejectRoleChange(${req.user_id})">
+                            <i class="bi bi-x-circle"></i> Reject
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        } catch (error) {
+            console.error('Error loading role change requests:', error);
+        }
+    }
+
+    async function loadPendingProperties() {
+        try {
+            const response = await fetch('/api/admin/pending-properties');
+            const properties = await response.json();
+            
+            const tbody = document.getElementById('pendingPropertiesTable');
+            
+            if (properties.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center">No pending properties.</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = properties.map(prop => `
+                <tr>
+                    <td>
+                        <strong>${escapeHtml(prop.property_name)}</strong><br>
+                        <small class="text-muted">${escapeHtml(prop.description || '').substring(0, 50)}${prop.description && prop.description.length > 50 ? '...' : ''}</small>
+                    </td>
+                    <td>${escapeHtml(prop.location)}</td>
+                    <td>
+                        ${escapeHtml(prop.owner_name)}<br>
+                        <small class="text-muted">${escapeHtml(prop.owner_email)}</small>
+                    </td>
+                    <td><span class="badge bg-info">${prop.total_rooms || 0} rooms</span></td>
+                    <td>${formatDate(prop.date_posted)}</td>
+                    <td>
+                        <button class="btn btn-sm btn-success" onclick="approveProperty(${prop.property_id})">
+                            <i class="bi bi-check-circle"></i> Approve
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="rejectProperty(${prop.property_id})">
+                            <i class="bi bi-x-circle"></i> Reject
+                        </button>
+                        <a href="/property/${prop.property_id}" class="btn btn-sm btn-outline-primary" target="_blank">
+                            <i class="bi bi-eye"></i> View
+                        </a>
+                    </td>
+                </tr>
+            `).join('');
+        } catch (error) {
+            console.error('Error loading pending properties:', error);
+        }
+    }
+
+    async function approveProperty(propertyId) {
+        if (!confirm('Approve this property? It will be visible on the browsing page.')) return;
+        
+        try {
+            const response = await fetch(`/api/admin/approve-property/${propertyId}`, {
+                method: 'POST'
+            });
+            const data = await response.json();
+            
+            if (response.ok) {
+                alert('Property approved successfully!');
+                loadAdminDashboard();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to approve property'));
+            }
+        } catch (error) {
+            console.error('Error approving property:', error);
+            alert('Error approving property');
+        }
+    }
+
+    async function rejectProperty(propertyId) {
+        if (!confirm('Reject this property? This action cannot be undone.')) return;
+        
+        try {
+            const response = await fetch(`/api/admin/reject-property/${propertyId}`, {
+                method: 'POST'
+            });
+            const data = await response.json();
+            
+            if (response.ok) {
+                alert('Property rejected.');
+                loadAdminDashboard();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to reject property'));
+            }
+        } catch (error) {
+            console.error('Error rejecting property:', error);
+            alert('Error rejecting property');
+        }
+    }
+
+    async function approveUser(userId) {
+        if (!confirm('Approve this user account?')) return;
+        
+        try {
+            const response = await fetch(`/api/admin/approve-user/${userId}`, {
+                method: 'POST'
+            });
+            const data = await response.json();
+            
+            if (response.ok) {
+                alert('User approved successfully!');
+                loadAdminDashboard();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to approve user'));
+            }
+        } catch (error) {
+            console.error('Error approving user:', error);
+            alert('Error approving user');
+        }
+    }
+
+    async function rejectUser(userId) {
+        if (!confirm('Reject this user account? This action cannot be undone.')) return;
+        
+        try {
+            const response = await fetch(`/api/admin/reject-user/${userId}`, {
+                method: 'POST'
+            });
+            const data = await response.json();
+            
+            if (response.ok) {
+                alert('User rejected.');
+                loadAdminDashboard();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to reject user'));
+            }
+        } catch (error) {
+            console.error('Error rejecting user:', error);
+            alert('Error rejecting user');
+        }
+    }
+
+    async function approveRoleChange(userId) {
+        if (!confirm('Approve this role change request?')) return;
+        
+        try {
+            const response = await fetch(`/api/admin/approve-role-change/${userId}`, {
+                method: 'POST'
+            });
+            const data = await response.json();
+            
+            if (response.ok) {
+                alert('Role change approved successfully!');
+                loadAdminDashboard();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to approve role change'));
+            }
+        } catch (error) {
+            console.error('Error approving role change:', error);
+            alert('Error approving role change');
+        }
+    }
+
+    async function rejectRoleChange(userId) {
+        if (!confirm('Reject this role change request?')) return;
+        
+        try {
+            const response = await fetch(`/api/admin/reject-role-change/${userId}`, {
+                method: 'POST'
+            });
+            const data = await response.json();
+            
+            if (response.ok) {
+                alert('Role change request rejected.');
+                loadAdminDashboard();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to reject role change'));
+            }
+        } catch (error) {
+            console.error('Error rejecting role change:', error);
+            alert('Error rejecting role change');
+        }
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function formatDate(dateString) {
+        if (!dateString) return 'N/A';
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    }
+
+    // Load dashboard on page load
+    loadAdminDashboard();
+</script>
+{% endblock %}
+

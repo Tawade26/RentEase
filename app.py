@@ -13,7 +13,7 @@ import hashlib
 
 # Try to import Google Generative AI (optional)
 try:
-    import google.generativeai as genai
+    from google import genai
     GEMINI_AVAILABLE = True
 except (ImportError, TypeError) as e:
     print(f"Warning: Google Generative AI not available: {e}")
@@ -39,15 +39,14 @@ DB_CONFIG = {
 
 
 # Configure Gemini AI
-ai_model = None
+ai_client = None
 GEMINI_API_KEY = os.getenv('GOOGLE_API_KEY')
 if GEMINI_AVAILABLE and GEMINI_API_KEY:
     try:
-        genai.configure(api_key=GEMINI_API_KEY)
-        ai_model = genai.GenerativeModel('gemini-2.0-flash')
+        ai_client = genai.Client(api_key=GEMINI_API_KEY)
     except Exception as e:
         print(f"Warning: Failed to configure Gemini AI: {e}")
-        ai_model = None
+        ai_client = None
 
 # Rate limiting for AI requests
 class RateLimiter:
@@ -149,6 +148,14 @@ def require_owner(f):
     def decorated_function(*args, **kwargs):
         if not session.get('logged_in') or session.get('role') != 'owner':
             return jsonify({'error': 'Unauthorized. Owner access required.'}), 403
+        return f(*args, **kwargs)
+    return decorated_function
+
+def require_admin(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('logged_in') or session.get('role') != 'admin':
+            return jsonify({'error': 'Unauthorized. Admin access required.'}), 403
         return f(*args, **kwargs)
     return decorated_function
 
@@ -270,9 +277,27 @@ def browse():
 def login_page():
     return render_template('login.html')
 
+@app.route('/register')
+def register_page():
+    return render_template('register.html')
+
+@app.route('/admin-dashboard')
+def admin_dashboard():
+    if not session.get('logged_in') or session.get('role') != 'admin':
+        return redirect(url_for('login_page'))
+    return render_template('admin-dashboard.html')
+
 @app.route('/property/<int:property_id>')
 def property_details(property_id):
     return render_template('property-details.html', property_id=property_id)
+
+@app.route('/messaging')
+@require_login
+def messaging_page():
+    """Messaging page for tenants"""
+    if session.get('role') != 'tenant':
+        return redirect('/browse')
+    return render_template('messaging.html')
 
 # ==================== API ROUTES ====================
 
@@ -285,7 +310,8 @@ def get_properties():
                 SELECT p.*, u.full_name as owner_name
                 FROM properties p
                 JOIN users u ON p.owner_id = u.user_id
-                WHERE p.deleted_at IS NULL
+                WHERE p.deleted_at IS NULL 
+                AND p.status = 'approved'
                 ORDER BY p.date_posted DESC
             """)
             properties = cursor.fetchall()
@@ -309,7 +335,7 @@ def get_property(property_id):
     try:
         with get_db_cursor() as cursor:
             cursor.execute("""
-                SELECT p.*, u.full_name as owner_name, u.email as owner_email, u.phone_number as owner_phone
+                SELECT p.*, p.owner_id, u.full_name as owner_name, u.email as owner_email, u.phone_number as owner_phone
                 FROM properties p
                 JOIN users u ON p.owner_id = u.user_id
                 WHERE p.property_id = %s AND p.deleted_at IS NULL
@@ -317,6 +343,16 @@ def get_property(property_id):
             property = cursor.fetchone()
             if not property:
                 return jsonify({'error': 'Property not found'}), 404
+            
+            # Calculate available rooms count
+            cursor.execute("""
+                SELECT COUNT(*) as room_count
+                FROM rooms
+                WHERE property_id = %s AND deleted_at IS NULL AND available_tenants > 0
+            """, (property_id,))
+            room_result = cursor.fetchone()
+            property['available_rooms'] = room_result['room_count'] if room_result else 0
+            
             return jsonify(property)
     except Error as e:
         return jsonify({'error': str(e)}), 500
@@ -395,7 +431,7 @@ def chat():
             })
         
         # Check if Gemini API is configured
-        if not ai_model:
+        if not ai_client:
             return jsonify({
                 'response': 'AI service is not configured. Please contact the administrator.',
                 'timestamp': None
@@ -437,8 +473,17 @@ SQL Query:"""
         
         try:
             # Single attempt with proper error handling
-            response = ai_model.generate_content(prompt)
-            sql_query = response.text.strip()
+            response = ai_client.models.generate_content(
+                model='gemini-2.0-flash-001',
+                contents=genai.types.Part.from_text(text=prompt)
+            )
+            # Access response text (structure may vary by version)
+            if hasattr(response, 'text'):
+                sql_query = response.text.strip()
+            elif hasattr(response, 'candidates') and response.candidates:
+                sql_query = response.candidates[0].content.parts[0].text.strip()
+            else:
+                sql_query = str(response).strip()
             
             # Remove markdown code blocks if present
             if sql_query.startswith('```'):
@@ -508,6 +553,37 @@ def user_status():
         })
     return jsonify({'logged_in': False})
 
+@app.route('/api/user-profile', methods=['GET'])
+@require_login
+def get_user_profile():
+    """Get current user's profile information"""
+    try:
+        user_id = session.get('user_id')
+        with get_db_cursor() as cursor:
+            cursor.execute("""
+                SELECT user_id, full_name, email, phone_number, role, 
+                       status, role_change_request, date_registered
+                FROM users
+                WHERE user_id = %s AND deleted_at IS NULL
+            """, (user_id,))
+            user = cursor.fetchone()
+            
+            if not user:
+                return jsonify({'error': 'User not found'}), 404
+            
+            return jsonify({
+                'user_id': user['user_id'],
+                'full_name': user['full_name'],
+                'email': user['email'],
+                'phone_number': user['phone_number'],
+                'role': user['role'],
+                'status': user['status'],
+                'role_change_request': user['role_change_request'],
+                'date_registered': user['date_registered'].isoformat() if user['date_registered'] else None
+            })
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/schema', methods=['GET'])
 def get_schema():
     return jsonify({'schema': get_minimal_schema()})
@@ -542,30 +618,46 @@ def login():
         
         with get_db_cursor() as cursor:
             cursor.execute("""
-                SELECT user_id, full_name, email, role
+                SELECT user_id, full_name, email, role, status, role_change_request
                 FROM users
                 WHERE email = %s AND password = %s
-                AND role IN ('tenant', 'owner')
                 AND deleted_at IS NULL
             """, (email, password))
             user = cursor.fetchone()
             
             if user:
-                session['logged_in'] = True
-                session['user_id'] = user['user_id']
-                session['full_name'] = user['full_name']
-                session['email'] = user['email']
-                session['role'] = user['role']
+                # Check if account is approved
+                if user['status'] != 'approved':
+                    if user['status'] == 'pending':
+                        return jsonify({
+                            'error': 'Your account is pending approval. Please wait for admin approval.',
+                            'status': 'pending'
+                        }), 403
+                    elif user['status'] == 'rejected':
+                        return jsonify({
+                            'error': 'Your account has been rejected. Please contact administrator.',
+                            'status': 'rejected'
+                        }), 403
                 
-                return jsonify({
-                    'success': True,
-                    'user': {
-                        'user_id': user['user_id'],
-                        'full_name': user['full_name'],
-                        'email': user['email'],
-                        'role': user['role']
-                    }
-                })
+                # Allow admin, approved tenants, and approved owners
+                if user['role'] == 'admin' or user['status'] == 'approved':
+                    session['logged_in'] = True
+                    session['user_id'] = user['user_id']
+                    session['full_name'] = user['full_name']
+                    session['email'] = user['email']
+                    session['role'] = user['role']
+                    
+                    return jsonify({
+                        'success': True,
+                        'user': {
+                            'user_id': user['user_id'],
+                            'full_name': user['full_name'],
+                            'email': user['email'],
+                            'role': user['role']
+                        }
+                    })
+                else:
+                    return jsonify({'error': 'Account not approved'}), 403
             else:
                 return jsonify({'error': 'Invalid credentials'}), 401
     
@@ -577,12 +669,218 @@ def logout():
     session.clear()
     return jsonify({'success': True, 'message': 'Logged out successfully'})
 
+@app.route('/api/tenant/active-booking', methods=['GET'])
+@require_login
+def get_tenant_active_booking():
+    """Check if tenant has an active booking"""
+    try:
+        tenant_id = session.get('user_id')
+        role = session.get('role')
+        
+        if role != 'tenant':
+            return jsonify({'error': 'Only tenants can check active bookings'}), 403
+        
+        with get_db_cursor() as cursor:
+            # Check for approved bookings
+            cursor.execute("""
+                SELECT b.*, 
+                       p.property_name, p.location,
+                       r.room_type, r.monthly_rate
+                FROM bookings b
+                JOIN rooms r ON b.room_id = r.room_id
+                JOIN properties p ON r.property_id = p.property_id
+                WHERE b.tenant_id = %s 
+                  AND b.status = 'approved'
+                  AND b.deleted_at IS NULL
+                ORDER BY b.created_at DESC
+                LIMIT 1
+            """, (tenant_id,))
+            booking = cursor.fetchone()
+            
+            if booking:
+                return jsonify({
+                    'has_active_booking': True,
+                    'booking': booking
+                })
+            else:
+                return jsonify({
+                    'has_active_booking': False,
+                    'booking': None
+                })
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/bookings', methods=['POST'])
+@require_login
+def create_booking():
+    """Create a booking request (tenant only)"""
+    try:
+        tenant_id = session.get('user_id')
+        role = session.get('role')
+        
+        if role != 'tenant':
+            return jsonify({'error': 'Only tenants can create bookings'}), 403
+        
+        # Check if tenant already has an active booking
+        with get_db_cursor() as cursor:
+            cursor.execute("""
+                SELECT booking_id FROM bookings
+                WHERE tenant_id = %s 
+                  AND status = 'approved'
+                  AND deleted_at IS NULL
+                LIMIT 1
+            """, (tenant_id,))
+            existing_booking = cursor.fetchone()
+            
+            if existing_booking:
+                return jsonify({
+                    'error': 'You already have an active booking. Please cancel your current booking before creating a new one.'
+                }), 400
+        
+        data = request.get_json()
+        room_id = data.get('room_id')
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')  # Optional
+        
+        if not room_id or not start_date:
+            return jsonify({'error': 'Room ID and start date are required'}), 400
+        
+        with get_db_cursor() as cursor:
+            # Verify room exists and has availability
+            cursor.execute("""
+                SELECT r.room_id, r.available_tenants, r.property_id, p.owner_id
+                FROM rooms r
+                JOIN properties p ON r.property_id = p.property_id
+                WHERE r.room_id = %s AND r.deleted_at IS NULL AND p.deleted_at IS NULL
+            """, (room_id,))
+            room = cursor.fetchone()
+            
+            if not room:
+                return jsonify({'error': 'Room not found'}), 404
+            
+            if room['available_tenants'] <= 0:
+                return jsonify({'error': 'Room is fully booked'}), 400
+            
+            # Create booking with pending status
+            cursor.execute("""
+                INSERT INTO bookings (tenant_id, room_id, start_date, end_date, status)
+                VALUES (%s, %s, %s, %s, 'pending')
+            """, (tenant_id, room_id, start_date, end_date if end_date else None))
+            
+            booking_id = cursor.lastrowid
+            
+            return jsonify({
+                'success': True,
+                'message': 'Booking request submitted successfully! Waiting for owner approval.',
+                'booking_id': booking_id
+            })
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/register', methods=['POST'])
+def register():
+    """Register a new user (defaults to tenant, requires approval)"""
+    try:
+        data = request.get_json()
+        full_name = data.get('full_name', '').strip()
+        email = data.get('email', '').strip()
+        password = data.get('password', '').strip()
+        phone_number = data.get('phone_number', '').strip()
+        role = data.get('role', 'tenant').strip().lower()  # Default to tenant
+        
+        # Validate role
+        if role not in ['tenant', 'owner']:
+            role = 'tenant'
+        
+        # Validate required fields
+        if not full_name or not email or not password:
+            return jsonify({'error': 'Full name, email, and password are required'}), 400
+        
+        # Validate email format
+        if '@' not in email:
+            return jsonify({'error': 'Invalid email format'}), 400
+        
+        with get_db_cursor() as cursor:
+            # Check if email already exists
+            cursor.execute("""
+                SELECT user_id FROM users WHERE email = %s AND deleted_at IS NULL
+            """, (email,))
+            if cursor.fetchone():
+                return jsonify({'error': 'Email already registered'}), 400
+            
+            # Create new user with pending status
+            cursor.execute("""
+                INSERT INTO users (full_name, email, password, phone_number, role, status)
+                VALUES (%s, %s, %s, %s, %s, 'pending')
+            """, (full_name, email, password, phone_number if phone_number else None, role))
+            
+            user_id = cursor.lastrowid
+            
+            return jsonify({
+                'success': True,
+                'message': 'Registration successful! Your account is pending approval. You will be notified once approved.',
+                'user_id': user_id,
+                'status': 'pending'
+            })
+    
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/request-role-change', methods=['POST'])
+@require_login
+def request_role_change():
+    """Request to change role (tenant to owner)"""
+    try:
+        user_id = session.get('user_id')
+        data = request.get_json()
+        new_role = data.get('role', 'owner').strip().lower()
+        
+        if new_role not in ['owner']:
+            return jsonify({'error': 'Invalid role. Can only request owner role.'}), 400
+        
+        with get_db_cursor() as cursor:
+            # Check current role
+            cursor.execute("""
+                SELECT role, status FROM users WHERE user_id = %s
+            """, (user_id,))
+            user = cursor.fetchone()
+            
+            if not user:
+                return jsonify({'error': 'User not found'}), 404
+            
+            if user['role'] == 'owner':
+                return jsonify({'error': 'You are already an owner'}), 400
+            
+            if user['role'] != 'tenant':
+                return jsonify({'error': 'Only tenants can request owner role'}), 400
+            
+            # Update role change request
+            cursor.execute("""
+                UPDATE users 
+                SET role_change_request = %s
+                WHERE user_id = %s
+            """, (new_role, user_id))
+            
+            return jsonify({
+                'success': True,
+                'message': 'Role change request submitted. Waiting for admin approval.'
+            })
+    
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+
 # Owner-Only Routes
 @app.route('/owner-dashboard')
 def owner_dashboard():
     if not session.get('logged_in') or session.get('role') != 'owner':
         return redirect(url_for('login_page'))
     return render_template('owner-dashboard.html')
+
+@app.route('/upload-property')
+def upload_property_page():
+    if not session.get('logged_in') or session.get('role') != 'owner':
+        return redirect(url_for('login_page'))
+    return render_template('upload-property.html')
 
 @app.route('/api/owner/properties', methods=['GET'])
 @require_owner
@@ -598,7 +896,13 @@ def get_owner_properties():
                         WHERE r.property_id = p.property_id AND r.deleted_at IS NULL AND r.available_tenants > 0) as available_rooms
                 FROM properties p
                 WHERE p.owner_id = %s AND p.deleted_at IS NULL
-                ORDER BY p.date_posted DESC
+                ORDER BY 
+                    CASE p.status 
+                        WHEN 'pending' THEN 1 
+                        WHEN 'approved' THEN 2 
+                        WHEN 'rejected' THEN 3 
+                    END,
+                    p.date_posted DESC
             """, (owner_id,))
             properties = cursor.fetchall()
             return jsonify(properties)
@@ -627,6 +931,58 @@ def get_owner_bookings():
             """, (owner_id,))
             bookings = cursor.fetchall()
             return jsonify(bookings)
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/owner/bookings/<int:booking_id>/status', methods=['PUT'])
+@require_owner
+def update_booking_status(booking_id):
+    try:
+        owner_id = session.get('user_id')
+        data = request.get_json()
+        new_status = data.get('status')
+        
+        if new_status not in ['pending', 'approved', 'rejected', 'cancelled', 'completed']:
+            return jsonify({'error': 'Invalid status'}), 400
+        
+        with get_db_cursor() as cursor:
+            # Verify the booking belongs to this owner
+            cursor.execute("""
+                SELECT b.booking_id
+                FROM bookings b
+                JOIN rooms r ON b.room_id = r.room_id
+                JOIN properties p ON r.property_id = p.property_id
+                WHERE b.booking_id = %s AND p.owner_id = %s AND b.deleted_at IS NULL
+            """, (booking_id, owner_id))
+            
+            booking = cursor.fetchone()
+            if not booking:
+                return jsonify({'error': 'Booking not found or unauthorized'}), 404
+            
+            # Get old status for trigger logic
+            cursor.execute("""
+                SELECT status FROM bookings WHERE booking_id = %s
+            """, (booking_id,))
+            old_booking = cursor.fetchone()
+            old_status = old_booking['status'] if old_booking else None
+            
+            # Update booking status (removed updated_at as it doesn't exist in schema)
+            cursor.execute("""
+                UPDATE bookings
+                SET status = %s
+                WHERE booking_id = %s
+            """, (new_status, booking_id))
+            
+            # The database trigger will automatically:
+            # 1. Log the status change to booking_history
+            # 2. Update room availability (available_tenants, current_tenants) if approved/rejected
+            
+            return jsonify({
+                'success': True, 
+                'message': f'Booking status updated to {new_status}',
+                'old_status': old_status,
+                'new_status': new_status
+            })
     except Error as e:
         return jsonify({'error': str(e)}), 500
 
@@ -669,7 +1025,7 @@ def owner_tenant_chat():
         if not message:
             return jsonify({'error': 'Message is required'}), 400
         
-        if not ai_model:
+        if not ai_client:
             return jsonify({
                 'response': 'AI service is not configured.',
                 'timestamp': None
@@ -729,8 +1085,17 @@ Answer the question using the tenant data provided. Use tenant names, provide st
 Answer:"""
         
         try:
-            response = ai_model.generate_content(prompt)
-            answer = response.text.strip()
+            response = ai_client.models.generate_content(
+                model='gemini-2.0-flash-001',
+                contents=genai.types.Part.from_text(text=prompt)
+            )
+            # Access response text (structure may vary by version)
+            if hasattr(response, 'text'):
+                answer = response.text.strip()
+            elif hasattr(response, 'candidates') and response.candidates:
+                answer = response.candidates[0].content.parts[0].text.strip()
+            else:
+                answer = str(response).strip()
             
             return jsonify({
                 'response': answer,
@@ -1054,6 +1419,377 @@ def delete_todo(todo_id):
         session['todos'] = todos
         return jsonify({'success': True})
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# Admin Routes
+@app.route('/api/admin/pending-users', methods=['GET'])
+@require_admin
+def get_pending_users():
+    """Get all pending user registrations"""
+    try:
+        with get_db_cursor() as cursor:
+            cursor.execute("""
+                SELECT user_id, full_name, email, phone_number, role, status, 
+                       role_change_request, date_registered
+                FROM users
+                WHERE status = 'pending' AND deleted_at IS NULL
+                ORDER BY date_registered DESC
+            """)
+            users = cursor.fetchall()
+            return jsonify(users)
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/role-change-requests', methods=['GET'])
+@require_admin
+def get_role_change_requests():
+    """Get all role change requests"""
+    try:
+        with get_db_cursor() as cursor:
+            cursor.execute("""
+                SELECT user_id, full_name, email, phone_number, role, 
+                       role_change_request, date_registered
+                FROM users
+                WHERE role_change_request IS NOT NULL 
+                  AND status = 'approved'
+                  AND deleted_at IS NULL
+                ORDER BY date_registered DESC
+            """)
+            requests = cursor.fetchall()
+            return jsonify(requests)
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/approve-user/<int:user_id>', methods=['POST'])
+@require_admin
+def approve_user(user_id):
+    """Approve a user account"""
+    try:
+        admin_id = session.get('user_id')
+        with get_db_cursor() as cursor:
+            cursor.execute("""
+                UPDATE users 
+                SET status = 'approved',
+                    approved_by = %s,
+                    approved_at = NOW()
+                WHERE user_id = %s AND deleted_at IS NULL
+            """, (admin_id, user_id))
+            
+            if cursor.rowcount == 0:
+                return jsonify({'error': 'User not found'}), 404
+            
+            return jsonify({
+                'success': True,
+                'message': 'User approved successfully'
+            })
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/reject-user/<int:user_id>', methods=['POST'])
+@require_admin
+def reject_user(user_id):
+    """Reject a user account"""
+    try:
+        admin_id = session.get('user_id')
+        with get_db_cursor() as cursor:
+            cursor.execute("""
+                UPDATE users 
+                SET status = 'rejected',
+                    approved_by = %s,
+                    approved_at = NOW()
+                WHERE user_id = %s AND deleted_at IS NULL
+            """, (admin_id, user_id))
+            
+            if cursor.rowcount == 0:
+                return jsonify({'error': 'User not found'}), 404
+            
+            return jsonify({
+                'success': True,
+                'message': 'User rejected successfully'
+            })
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/approve-role-change/<int:user_id>', methods=['POST'])
+@require_admin
+def approve_role_change(user_id):
+    """Approve a role change request"""
+    try:
+        admin_id = session.get('user_id')
+        with get_db_cursor() as cursor:
+            # Get the requested role
+            cursor.execute("""
+                SELECT role_change_request FROM users 
+                WHERE user_id = %s AND role_change_request IS NOT NULL
+            """, (user_id,))
+            user = cursor.fetchone()
+            
+            if not user:
+                return jsonify({'error': 'Role change request not found'}), 404
+            
+            new_role = user['role_change_request']
+            
+            # Update user role and clear request
+            cursor.execute("""
+                UPDATE users 
+                SET role = %s,
+                    role_change_request = NULL,
+                    approved_by = %s
+                WHERE user_id = %s AND deleted_at IS NULL
+            """, (new_role, admin_id, user_id))
+            
+            return jsonify({
+                'success': True,
+                'message': f'Role changed to {new_role} successfully'
+            })
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/reject-role-change/<int:user_id>', methods=['POST'])
+@require_admin
+def reject_role_change(user_id):
+    """Reject a role change request"""
+    try:
+        with get_db_cursor() as cursor:
+            cursor.execute("""
+                UPDATE users 
+                SET role_change_request = NULL
+                WHERE user_id = %s AND deleted_at IS NULL
+            """, (user_id,))
+            
+            if cursor.rowcount == 0:
+                return jsonify({'error': 'User not found'}), 404
+            
+            return jsonify({
+                'success': True,
+                'message': 'Role change request rejected'
+            })
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/stats', methods=['GET'])
+@require_admin
+def get_admin_stats():
+    """Get admin dashboard statistics"""
+    try:
+        with get_db_cursor() as cursor:
+            # Pending users count
+            cursor.execute("SELECT COUNT(*) as count FROM users WHERE status = 'pending' AND deleted_at IS NULL")
+            pending_users = cursor.fetchone()['count']
+            
+            # Role change requests count
+            cursor.execute("SELECT COUNT(*) as count FROM users WHERE role_change_request IS NOT NULL AND status = 'approved'")
+            role_requests = cursor.fetchone()['count']
+            
+            # Total users
+            cursor.execute("SELECT COUNT(*) as count FROM users WHERE deleted_at IS NULL")
+            total_users = cursor.fetchone()['count']
+            
+            # Users by role
+            cursor.execute("""
+                SELECT role, COUNT(*) as count 
+                FROM users 
+                WHERE deleted_at IS NULL AND status = 'approved'
+                GROUP BY role
+            """)
+            users_by_role = cursor.fetchall()
+            
+            # Pending properties count
+            cursor.execute("SELECT COUNT(*) as count FROM properties WHERE status = 'pending' AND deleted_at IS NULL")
+            pending_properties = cursor.fetchone()['count']
+            
+            return jsonify({
+                'pending_users': pending_users,
+                'role_requests': role_requests,
+                'pending_properties': pending_properties,
+                'total_users': total_users,
+                'users_by_role': users_by_role
+            })
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+
+# Owner Property Management Routes
+@app.route('/api/owner/create-property', methods=['POST'])
+@require_owner
+def create_property():
+    """Create a new property (pending approval)"""
+    try:
+        owner_id = session.get('user_id')
+        data = request.get_json()
+        
+        property_name = data.get('property_name', '').strip()
+        description = data.get('description', '').strip()
+        location = data.get('location', '').strip()
+        amenities = data.get('amenities', [])  # Array of amenity names
+        
+        if not property_name or not location:
+            return jsonify({'error': 'Property name and location are required'}), 400
+        
+        with get_db_cursor() as cursor:
+            # Create property with pending status
+            cursor.execute("""
+                INSERT INTO properties (owner_id, property_name, description, location, status)
+                VALUES (%s, %s, %s, %s, 'pending')
+            """, (owner_id, property_name, description, location))
+            
+            property_id = cursor.lastrowid
+            
+            # Add amenities if provided
+            if amenities and isinstance(amenities, list):
+                for amenity in amenities:
+                    if amenity.strip():
+                        cursor.execute("""
+                            INSERT INTO property_amenities (property_id, amenity_name)
+                            VALUES (%s, %s)
+                        """, (property_id, amenity.strip()))
+            
+            return jsonify({
+                'success': True,
+                'message': 'Property created successfully! Waiting for admin approval.',
+                'property_id': property_id
+            })
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/owner/add-room', methods=['POST'])
+@require_owner
+def add_room():
+    """Add a room to a property"""
+    try:
+        owner_id = session.get('user_id')
+        data = request.get_json()
+        
+        property_id = data.get('property_id')
+        room_type = data.get('room_type', 'Single')
+        monthly_rate = data.get('monthly_rate')
+        description = data.get('description', '').strip()
+        total_tenants = data.get('total_tenants', 1)
+        house_rules = data.get('house_rules', '').strip()
+        
+        if not property_id or not monthly_rate:
+            return jsonify({'error': 'Property ID and monthly rate are required'}), 400
+        
+        if room_type not in ['Single', 'Shared']:
+            return jsonify({'error': 'Room type must be Single or Shared'}), 400
+        
+        # Verify property belongs to owner
+        with get_db_cursor() as cursor:
+            cursor.execute("""
+                SELECT property_id FROM properties 
+                WHERE property_id = %s AND owner_id = %s AND deleted_at IS NULL
+            """, (property_id, owner_id))
+            if not cursor.fetchone():
+                return jsonify({'error': 'Property not found or access denied'}), 403
+            
+            # Create room
+            cursor.execute("""
+                INSERT INTO rooms (property_id, room_type, monthly_rate, description, 
+                                 total_tenants, available_tenants, house_rules)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (property_id, room_type, monthly_rate, description, 
+                  total_tenants, total_tenants, house_rules))
+            
+            room_id = cursor.lastrowid
+            
+            return jsonify({
+                'success': True,
+                'message': 'Room added successfully',
+                'room_id': room_id
+            })
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/owner/pending-properties', methods=['GET'])
+@require_owner
+def get_pending_properties():
+    """Get owner's pending properties"""
+    try:
+        owner_id = session.get('user_id')
+        with get_db_cursor() as cursor:
+            cursor.execute("""
+                SELECT p.*, 
+                       (SELECT COUNT(*) FROM rooms r 
+                        WHERE r.property_id = p.property_id AND r.deleted_at IS NULL) as total_rooms
+                FROM properties p
+                WHERE p.owner_id = %s 
+                  AND p.status = 'pending'
+                  AND p.deleted_at IS NULL
+                ORDER BY p.date_posted DESC
+            """, (owner_id,))
+            properties = cursor.fetchall()
+            return jsonify(properties)
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+
+# Admin Property Approval Routes
+@app.route('/api/admin/pending-properties', methods=['GET'])
+@require_admin
+def get_admin_pending_properties():
+    """Get all pending properties for admin approval"""
+    try:
+        with get_db_cursor() as cursor:
+            cursor.execute("""
+                SELECT p.*, u.full_name as owner_name, u.email as owner_email,
+                       (SELECT COUNT(*) FROM rooms r 
+                        WHERE r.property_id = p.property_id AND r.deleted_at IS NULL) as total_rooms
+                FROM properties p
+                JOIN users u ON p.owner_id = u.user_id
+                WHERE p.status = 'pending' AND p.deleted_at IS NULL
+                ORDER BY p.date_posted DESC
+            """)
+            properties = cursor.fetchall()
+            return jsonify(properties)
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/approve-property/<int:property_id>', methods=['POST'])
+@require_admin
+def approve_property(property_id):
+    """Approve a property"""
+    try:
+        admin_id = session.get('user_id')
+        with get_db_cursor() as cursor:
+            cursor.execute("""
+                UPDATE properties 
+                SET status = 'approved',
+                    approved_by = %s,
+                    approved_at = NOW()
+                WHERE property_id = %s AND deleted_at IS NULL
+            """, (admin_id, property_id))
+            
+            if cursor.rowcount == 0:
+                return jsonify({'error': 'Property not found'}), 404
+            
+            return jsonify({
+                'success': True,
+                'message': 'Property approved successfully'
+            })
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/reject-property/<int:property_id>', methods=['POST'])
+@require_admin
+def reject_property(property_id):
+    """Reject a property"""
+    try:
+        admin_id = session.get('user_id')
+        with get_db_cursor() as cursor:
+            cursor.execute("""
+                UPDATE properties 
+                SET status = 'rejected',
+                    approved_by = %s,
+                    approved_at = NOW()
+                WHERE property_id = %s AND deleted_at IS NULL
+            """, (admin_id, property_id))
+            
+            if cursor.rowcount == 0:
+                return jsonify({'error': 'Property not found'}), 404
+            
+            return jsonify({
+                'success': True,
+                'message': 'Property rejected'
+            })
+    except Error as e:
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':

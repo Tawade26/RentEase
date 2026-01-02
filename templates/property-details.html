@@ -16,6 +16,7 @@
 <script>
     const propertyId = {{ property_id }};
     let isLoggedIn = false;
+    let hasActiveBooking = false;
 
     async function checkLoginStatus() {
         try {
@@ -45,6 +46,11 @@
                 document.getElementById('propertyDetails').innerHTML = 
                     '<div class="alert alert-danger">Property not found.</div>';
                 return;
+            }
+
+            // Check active booking if logged in as tenant
+            if (isLoggedIn) {
+                await checkActiveBooking();
             }
 
             displayPropertyDetails(property, rooms, amenities, images);
@@ -90,6 +96,14 @@
                                     <p><strong>Available Rooms:</strong> ${property.available_rooms || 0}</p>
                                 </div>
                             </div>
+                            
+                            ${isLoggedIn ? `
+                                <div class="mb-3">
+                                    <button class="btn btn-primary" onclick="quickChatWithOwner('${escapeHtml(property.owner_name || 'Owner')}', ${property.owner_id || 0})">
+                                        <i class="bi bi-chat-dots"></i> Quick Chat with Owner
+                                    </button>
+                                </div>
+                            ` : ''}
 
                             ${amenities.length > 0 ? `
                                 <div class="mb-3">
@@ -138,7 +152,11 @@
                                             ` : ''}
                                         </div>
                                         <div class="card-footer bg-transparent">
-                                            ${room.available_tenants > 0 ? `
+                                            ${hasActiveBooking ? `
+                                                <button class="btn btn-secondary w-100" disabled>
+                                                    <i class="bi bi-exclamation-triangle"></i> You already have an active booking
+                                                </button>
+                                            ` : room.available_tenants > 0 ? `
                                                 <button class="btn btn-primary w-100" onclick="bookRoom(${room.room_id})">
                                                     <i class="bi bi-calendar-check"></i> Book Room
                                                 </button>
@@ -160,15 +178,69 @@
         `;
     }
 
-    function bookRoom(roomId) {
+    function quickChatWithOwner(ownerName, ownerId) {
+        // Navigate to messaging page with owner pre-selected
+        // For now, just show a placeholder message
+        if (confirm(`Quick chat with ${ownerName}? This will open the messaging page.`)) {
+            window.location.href = `/messaging?owner_id=${ownerId}`;
+        }
+    }
+
+    async function bookRoom(roomId) {
         if (!isLoggedIn) {
             if (confirm('You need to login to book a room. Would you like to go to the login page?')) {
                 window.location.href = '/login';
             }
             return;
         }
-        alert('Booking functionality is coming soon! This would create a booking request.');
-        // TODO: Implement booking form/modal
+        
+        if (hasActiveBooking) {
+            alert('You already have an active booking. You cannot book another room.');
+            return;
+        }
+        
+        // Get today's date in YYYY-MM-DD format
+        const today = new Date().toISOString().split('T')[0];
+        
+        // Simple booking form - using today as start date
+        const startDate = prompt('Enter start date (YYYY-MM-DD):', today);
+        if (!startDate) return;
+        
+        // Validate date format
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
+            alert('Invalid date format. Please use YYYY-MM-DD format.');
+            return;
+        }
+        
+        // Optional end date
+        const endDate = prompt('Enter end date (YYYY-MM-DD) - Optional. Leave blank for open-ended:', '');
+        
+        try {
+            const response = await fetch('/api/bookings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    room_id: roomId,
+                    start_date: startDate,
+                    end_date: endDate || null
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                alert('Booking request submitted successfully! The owner will review your request.');
+                // Reload property details to update availability
+                loadPropertyDetails();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to create booking request'));
+            }
+        } catch (error) {
+            console.error('Error creating booking:', error);
+            alert('Error creating booking request. Please try again.');
+        }
     }
 
     function escapeHtml(text) {
@@ -179,8 +251,9 @@
     }
 
     // Initialize
-    checkLoginStatus();
-    loadPropertyDetails();
+    checkLoginStatus().then(() => {
+        loadPropertyDetails();
+    });
 </script>
 {% endblock %}
 

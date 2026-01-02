@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}Messaging - RentEase{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1 class="display-4 mb-3">Messages</h1>
+        <p class="lead text-muted">Communicate with property owners</p>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-envelope"></i> Messages</h5>
+        <small class="text-muted">Communicate with property owners</small>
+    </div>
+    <div class="card-body">
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> Messaging functionality coming soon!
+        </div>
+        <div class="row">
+            <div class="col-md-4">
+                <div class="list-group" id="conversationsList">
+                    <div class="list-group-item">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div id="messageArea" style="height: 400px; border: 1px solid #dee2e6; padding: 1rem; border-radius: 0.25rem; overflow-y: auto; background-color: #f8f9fa;">
+                    <div class="text-center text-muted">
+                        <i class="bi bi-chat-left-text" style="font-size: 3rem;"></i>
+                        <p class="mt-3">Select a conversation to start messaging</p>
+                    </div>
+                </div>
+                <div class="input-group mt-3">
+                    <input type="text" class="form-control" id="messageInput" placeholder="Type a message..." disabled>
+                    <button class="btn btn-primary" id="sendMessageBtn" disabled>
+                        <i class="bi bi-send"></i> Send
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Get owner_id from URL if present (from quick chat button)
+    const urlParams = new URLSearchParams(window.location.search);
+    const ownerId = urlParams.get('owner_id');
+    
+    if (ownerId) {
+        // If owner_id is in URL, show a message about starting conversation
+        document.addEventListener('DOMContentLoaded', function() {
+            const messageArea = document.getElementById('messageArea');
+            messageArea.innerHTML = `
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> 
+                    Ready to start a conversation with this owner. Messaging functionality coming soon!
+                </div>
+            `;
+        });
+    }
+</script>
+{% endblock %}
+

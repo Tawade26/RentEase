@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1:3306
--- Generation Time: Dec 31, 2025 at 11:39 AM
+-- Generation Time: Jan 02, 2026 at 05:46 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -75,6 +75,24 @@ CREATE TABLE `bookings` (
 ) ;
 
 --
+-- Dumping data for table `bookings`
+--
+
+INSERT INTO `bookings` (`booking_id`, `tenant_id`, `room_id`, `start_date`, `end_date`, `status`, `created_at`, `deleted_at`) VALUES
+(1, 5, 1, '2026-01-01', '2026-12-31', 'approved', '2026-01-01 23:27:34', NULL),
+(2, 9, 3, '2026-01-05', '2026-06-30', 'approved', '2026-01-01 23:27:34', NULL),
+(3, 10, 3, '2026-01-05', '2026-06-30', 'approved', '2026-01-01 23:27:34', NULL),
+(4, 11, 3, '2026-01-10', '2026-06-30', 'rejected', '2026-01-01 23:27:34', NULL),
+(5, 12, 3, '2026-01-12', '2026-06-30', 'approved', '2026-01-01 23:27:34', NULL),
+(6, 13, 4, '2026-02-01', '2027-02-01', 'approved', '2026-01-01 23:27:34', NULL),
+(7, 14, 4, '2026-02-01', '2027-02-01', 'cancelled', '2026-01-01 23:27:34', NULL),
+(8, 15, 5, '2026-01-15', '2026-12-15', 'approved', '2026-01-01 23:27:34', NULL),
+(9, 16, 6, '2026-03-01', '2027-03-01', 'pending', '2026-01-01 23:27:34', NULL),
+(10, 17, 8, '2026-01-20', '2026-07-20', 'approved', '2026-01-01 23:27:34', NULL),
+(11, 19, 8, '2026-01-20', '2026-07-20', 'rejected', '2026-01-01 23:27:34', NULL),
+(12, 20, 9, '2026-01-02', NULL, 'approved', '2026-01-02 19:18:40', NULL);
+
+--
 -- Triggers `bookings`
 --
 DELIMITER $$
@@ -119,6 +137,23 @@ CREATE TABLE `booking_history` (
   `change_reason` text DEFAULT NULL,
   `changed_at` datetime DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `booking_history`
+--
+
+INSERT INTO `booking_history` (`history_id`, `booking_id`, `status_changed_to`, `changed_by`, `change_reason`, `changed_at`) VALUES
+(1, 1, 'approved', 5, NULL, '2026-01-01 23:27:34'),
+(2, 2, 'approved', 9, NULL, '2026-01-01 23:27:34'),
+(3, 3, 'approved', 10, NULL, '2026-01-01 23:27:34'),
+(4, 6, 'approved', 13, NULL, '2026-01-01 23:27:34'),
+(5, 8, 'approved', 15, NULL, '2026-01-01 23:27:34'),
+(6, 10, 'approved', 17, NULL, '2026-01-01 23:27:34'),
+(7, 7, 'cancelled', 14, NULL, '2026-01-01 23:27:34'),
+(8, 11, 'rejected', 19, NULL, '2026-01-01 23:27:34'),
+(9, 12, 'approved', 20, NULL, '2026-01-02 19:35:10'),
+(10, 4, 'rejected', 11, NULL, '2026-01-02 19:35:39'),
+(11, 5, 'approved', 12, NULL, '2026-01-02 19:35:44');
 
 -- --------------------------------------------------------
 
@@ -208,6 +243,18 @@ CREATE TABLE `payments` (
   `status` enum('pending','confirmed','failed','refunded') DEFAULT 'pending'
 ) ;
 
+--
+-- Dumping data for table `payments`
+--
+
+INSERT INTO `payments` (`payment_id`, `booking_id`, `tenant_id`, `room_id`, `amount_paid`, `payment_date`, `payment_method`, `status`) VALUES
+(1, 1, 5, 1, 4500.00, '2026-01-01 23:27:34', 'cash', 'confirmed'),
+(2, 2, 9, 3, 3500.00, '2026-01-01 23:27:34', 'gcash', 'confirmed'),
+(3, 3, 10, 3, 3500.00, '2026-01-01 23:27:34', 'gcash', 'confirmed'),
+(4, 6, 13, 4, 5000.00, '2026-01-01 23:27:34', 'bank_transfer', 'confirmed'),
+(5, 8, 15, 5, 7500.00, '2026-01-01 23:27:34', 'online', 'confirmed'),
+(6, 10, 17, 8, 8500.00, '2026-01-01 23:27:34', 'cash', 'pending');
+
 -- --------------------------------------------------------
 
 --
@@ -221,6 +268,17 @@ CREATE TABLE `payment_receipts` (
   `receipt_url` varchar(255) DEFAULT NULL,
   `issued_at` datetime DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `payment_receipts`
+--
+
+INSERT INTO `payment_receipts` (`receipt_id`, `payment_id`, `receipt_number`, `receipt_url`, `issued_at`) VALUES
+(1, 1, 'OR-001', NULL, '2026-01-01 23:27:34'),
+(2, 2, 'OR-002', NULL, '2026-01-01 23:27:34'),
+(3, 3, 'OR-003', NULL, '2026-01-01 23:27:34'),
+(4, 4, 'OR-004', NULL, '2026-01-01 23:27:34'),
+(5, 5, 'OR-005', NULL, '2026-01-01 23:27:34');
 
 -- --------------------------------------------------------
 
@@ -239,6 +297,15 @@ CREATE TABLE `payment_schedules` (
   `created_at` datetime DEFAULT current_timestamp()
 ) ;
 
+--
+-- Dumping data for table `payment_schedules`
+--
+
+INSERT INTO `payment_schedules` (`schedule_id`, `booking_id`, `due_date`, `amount_due`, `status`, `paid_at`, `payment_id`, `created_at`) VALUES
+(1, 1, '2026-02-01', 4500.00, 'pending', NULL, NULL, '2026-01-01 23:27:34'),
+(2, 2, '2026-02-05', 3500.00, 'pending', NULL, NULL, '2026-01-01 23:27:34'),
+(3, 8, '2026-02-15', 7500.00, 'pending', NULL, NULL, '2026-01-01 23:27:34');
+
 -- --------------------------------------------------------
 
 --
@@ -253,6 +320,9 @@ CREATE TABLE `properties` (
   `location` varchar(255) NOT NULL,
   `available_rooms` int(11) DEFAULT 0,
   `date_posted` datetime DEFAULT current_timestamp(),
+  `status` enum('pending','approved','rejected') DEFAULT 'pending',
+  `approved_by` int(11) DEFAULT NULL,
+  `approved_at` datetime DEFAULT NULL,
   `deleted_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -260,9 +330,12 @@ CREATE TABLE `properties` (
 -- Dumping data for table `properties`
 --
 
-INSERT INTO `properties` (`property_id`, `owner_id`, `property_name`, `description`, `location`, `available_rooms`, `date_posted`, `deleted_at`) VALUES
-(1, 2, 'Santos Boarding House', 'A quiet and secure boarding house near university belt. Ideal for students looking for a comfortable place to stay.', 'Manila, Metro Manila', 5, '2025-12-31 10:37:41', NULL),
-(2, 3, 'Dela Cruz Dormitory', 'Affordable dormitory with free Wi-Fi, laundry area, and 24/7 security. Perfect for college students.', 'Quezon City, Metro Manila', 8, '2025-12-31 10:37:41', NULL);
+INSERT INTO `properties` (`property_id`, `owner_id`, `property_name`, `description`, `location`, `available_rooms`, `date_posted`, `status`, `approved_by`, `approved_at`, `deleted_at`) VALUES
+(1, 2, 'Santos Boarding House', 'A quiet and secure boarding house near university belt. Ideal for students looking for a comfortable place to stay.', 'Manila, Metro Manila', 1, '2025-12-31 10:37:41', 'approved', NULL, NULL, NULL),
+(2, 3, 'Dela Cruz Dormitory', 'Affordable dormitory with free Wi-Fi, laundry area, and 24/7 security. Perfect for college students.', 'Quezon City, Metro Manila', 0, '2025-12-31 10:37:41', 'approved', NULL, NULL, NULL),
+(3, 7, 'Lim Residences', 'Walking distance to UST and FEU. Secure building with CCTV and bio-metric entry. Ideal for serious students.', 'Sampaloc, Manila', 2, '2026-01-01 23:25:29', 'approved', NULL, NULL, NULL),
+(4, 8, 'Greenview Apartments', 'Modern studio apartments near Makati CBD. Includes gym access and rooftop garden. Perfect for young professionals.', 'Makati City, Metro Manila', 3, '2026-01-01 23:25:29', 'approved', NULL, NULL, NULL),
+(5, 7, 'Glradiolyns', 'Right beside Pangasinan State University', 'Urdaneta City, Pangasinan', 1, '2026-01-02 18:17:43', 'approved', 1, '2026-01-02 18:18:14', NULL);
 
 -- --------------------------------------------------------
 
@@ -287,7 +360,19 @@ INSERT INTO `property_amenities` (`amenity_id`, `property_id`, `amenity_name`) V
 (1, 1, 'WiFi'),
 (6, 2, 'Laundry Area'),
 (7, 2, 'Study Area'),
-(5, 2, 'WiFi');
+(5, 2, 'WiFi'),
+(10, 3, '24/7 Security'),
+(11, 3, 'CCTV'),
+(9, 3, 'Study Area'),
+(8, 3, 'WiFi'),
+(12, 4, 'Air Conditioning'),
+(13, 4, 'Gym'),
+(14, 4, 'Parking'),
+(16, 4, 'Swimming Pool'),
+(15, 4, 'WiFi'),
+(18, 5, 'CCTV'),
+(19, 5, 'Public Rooftop'),
+(17, 5, 'WiFi');
 
 -- --------------------------------------------------------
 
@@ -343,8 +428,15 @@ CREATE TABLE `rooms` (
 --
 
 INSERT INTO `rooms` (`room_id`, `property_id`, `room_type`, `available_tenants`, `monthly_rate`, `description`, `total_tenants`, `current_tenants`, `house_rules`, `created_at`, `deleted_at`) VALUES
-(1, 1, 'Single', 1, 4500.00, 'Cozy single room near the university, includes WiFi and shared kitchen access.', 1, 0, 'No smoking, No pets, Quiet hours: 10 PM - 6 AM', '2025-12-31 10:37:41', NULL),
-(2, 1, 'Shared', 2, 4000.00, 'Shared room with 2 beds, good for budget-conscious students.', 2, 0, 'No smoking, No pets, Respect roommate privacy', '2025-12-31 10:37:41', NULL);
+(1, 1, 'Single', 0, 4500.00, 'Cozy single room near the university, includes WiFi and shared kitchen access.', 1, 1, 'No smoking, No pets, Quiet hours: 10 PM - 6 AM', '2025-12-31 10:37:41', NULL),
+(2, 1, 'Shared', 2, 4000.00, 'Shared room with 2 beds, good for budget-conscious students.', 2, 0, 'No smoking, No pets, Respect roommate privacy', '2025-12-31 10:37:41', NULL),
+(3, 3, 'Shared', 1, 3500.00, 'Spacious quad-sharing room with individual lockers.', 4, 3, 'No visitors after 9PM, Clean as you go', '2026-01-01 23:25:29', NULL),
+(4, 3, 'Shared', 1, 5000.00, 'Double deck bed for 2 pax, air-conditioned.', 2, 1, 'No smoking, Electric bill split by tenants', '2026-01-01 23:25:29', NULL),
+(5, 3, 'Single', 0, 7500.00, 'Private solo room with own study table.', 1, 1, 'No pets allowed', '2026-01-01 23:25:29', NULL),
+(6, 4, 'Single', 1, 15000.00, 'Premium studio unit with city view.', 1, 0, 'No loud parties, Pets allowed (small breeds only)', '2026-01-01 23:25:29', NULL),
+(7, 4, 'Single', 1, 12000.00, 'Cozy single unit, inner facing (quiet).', 1, 0, 'No smoking inside the unit', '2026-01-01 23:25:29', NULL),
+(8, 4, 'Shared', 1, 8500.00, 'Twin sharing deluxe room.', 2, 1, 'Keep noise to a minimum', '2026-01-01 23:25:29', NULL),
+(9, 5, 'Single', 3, 2000.00, 'Rooms for 2nd and Third Floor', 4, 1, '', '2026-01-02 18:17:43', NULL);
 
 --
 -- Triggers `rooms`
@@ -407,6 +499,10 @@ CREATE TABLE `users` (
   `password` varchar(255) NOT NULL,
   `phone_number` varchar(20) DEFAULT NULL,
   `role` enum('tenant','owner','admin') NOT NULL DEFAULT 'tenant',
+  `status` enum('pending','approved','rejected') DEFAULT 'pending',
+  `role_change_request` enum('tenant','owner') DEFAULT NULL,
+  `approved_by` int(11) DEFAULT NULL,
+  `approved_at` datetime DEFAULT NULL,
   `date_registered` datetime DEFAULT current_timestamp(),
   `deleted_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -415,13 +511,31 @@ CREATE TABLE `users` (
 -- Dumping data for table `users`
 --
 
-INSERT INTO `users` (`user_id`, `full_name`, `email`, `password`, `phone_number`, `role`, `date_registered`, `deleted_at`) VALUES
-(1, 'Admin User', 'admin@rentease.com', 'admin123', '09170000000', 'admin', '2025-12-31 10:37:41', NULL),
-(2, 'Maria Santos', 'maria.santos@rentease.com', 'owner123', '09171234567', 'owner', '2025-12-31 10:37:41', NULL),
-(3, 'John Dela Cruz', 'john.delacruz@rentease.com', 'owner123', '09179876543', 'owner', '2025-12-31 10:37:41', NULL),
-(4, 'Angela Reyes', 'angela.reyes@rentease.com', 'owner123', '09173451234', 'owner', '2025-12-31 10:37:41', NULL),
-(5, 'Kevin Mendoza', 'kevin.mendoza@student.com', 'tenant123', '09181234567', 'tenant', '2025-12-31 10:37:41', NULL),
-(6, 'Jessica Tan', 'jessica.tan@student.com', 'tenant123', '09182345678', 'tenant', '2025-12-31 10:37:41', NULL);
+INSERT INTO `users` (`user_id`, `full_name`, `email`, `password`, `phone_number`, `role`, `status`, `role_change_request`, `approved_by`, `approved_at`, `date_registered`, `deleted_at`) VALUES
+(1, 'Admin User', 'admin@rentease.com', 'admin123', '09170000000', 'admin', 'approved', NULL, NULL, '2026-01-02 16:26:04', '2025-12-31 10:37:41', NULL),
+(2, 'Maria Santos', 'maria.santos@rentease.com', 'owner123', '09171234567', 'owner', 'approved', NULL, NULL, '2025-12-31 10:37:41', '2025-12-31 10:37:41', NULL),
+(3, 'John Dela Cruz', 'john.delacruz@rentease.com', 'owner123', '09179876543', 'owner', 'approved', NULL, NULL, '2025-12-31 10:37:41', '2025-12-31 10:37:41', NULL),
+(4, 'Angela Reyes', 'angela.reyes@rentease.com', 'owner123', '09173451234', 'owner', 'approved', NULL, NULL, '2025-12-31 10:37:41', '2025-12-31 10:37:41', NULL),
+(5, 'Kevin Mendoza', 'kevin.mendoza@student.com', 'tenant123', '09181234567', 'tenant', 'approved', NULL, NULL, '2025-12-31 10:37:41', '2025-12-31 10:37:41', NULL),
+(6, 'Jessica Tan', 'jessica.tan@student.com', 'tenant123', '09182345678', 'tenant', 'approved', NULL, NULL, '2025-12-31 10:37:41', '2025-12-31 10:37:41', NULL),
+(7, 'Robert Lim', 'robert.lim@rentease.com', 'owner123', '09175551001', 'owner', 'approved', NULL, NULL, '2026-01-01 23:25:29', '2026-01-01 23:25:29', NULL),
+(8, 'Elena Go', 'elena.go@rentease.com', 'owner123', '09175551002', 'owner', 'approved', NULL, NULL, '2026-01-01 23:25:29', '2026-01-01 23:25:29', NULL),
+(9, 'Mark Dizon', 'mark.dizon@student.com', 'tenant123', '09185552001', 'tenant', 'approved', NULL, NULL, '2026-01-01 23:25:29', '2026-01-01 23:25:29', NULL),
+(10, 'Sarah Lee', 'sarah.lee@student.com', 'tenant123', '09185552002', 'tenant', 'approved', NULL, NULL, '2026-01-01 23:25:29', '2026-01-01 23:25:29', NULL),
+(11, 'Miguel Castro', 'miguel.castro@student.com', 'tenant123', '09185552003', 'tenant', 'approved', NULL, NULL, '2026-01-01 23:25:29', '2026-01-01 23:25:29', NULL),
+(12, 'Patricia Vega', 'patricia.vega@student.com', 'tenant123', '09185552004', 'tenant', 'approved', NULL, NULL, '2026-01-01 23:25:29', '2026-01-01 23:25:29', NULL),
+(13, 'Gabriel Ramos', 'gabriel.ramos@student.com', 'tenant123', '09191000001', 'tenant', 'approved', NULL, NULL, '2026-01-01 23:26:50', '2026-01-01 23:26:50', NULL),
+(14, 'Sofia Mendoza', 'sofia.mendoza@student.com', 'tenant123', '09191000002', 'tenant', 'approved', NULL, NULL, '2026-01-01 23:26:50', '2026-01-01 23:26:50', NULL),
+(15, 'Daniel Corpuz', 'daniel.corpuz@student.com', 'tenant123', '09191000003', 'tenant', 'approved', NULL, NULL, '2026-01-01 23:26:50', '2026-01-01 23:26:50', NULL),
+(16, 'Bea Tolentino', 'bea.tolentino@student.com', 'tenant123', '09191000004', 'tenant', 'approved', NULL, NULL, '2026-01-01 23:26:50', '2026-01-01 23:26:50', NULL),
+(17, 'Rafael Navarro', 'rafael.navarro@student.com', 'tenant123', '09191000005', 'tenant', 'approved', NULL, NULL, '2026-01-01 23:26:50', '2026-01-01 23:26:50', NULL),
+(18, 'Camille Aquino', 'camille.aquino@student.com', 'tenant123', '09191000006', 'tenant', 'approved', NULL, NULL, '2026-01-01 23:26:50', '2026-01-01 23:26:50', NULL),
+(19, 'Joshua Ferrer', 'joshua.ferrer@student.com', 'tenant123', '09191000007', 'tenant', 'approved', NULL, NULL, '2026-01-01 23:26:50', '2026-01-01 23:26:50', NULL),
+(20, 'Lara Bautista', 'lara.bautista@student.com', 'tenant123', '09191000008', 'tenant', 'approved', NULL, NULL, '2026-01-01 23:26:50', '2026-01-01 23:26:50', NULL),
+(21, 'Christian Roque', 'christian.roque@student.com', 'tenant123', '09191000009', 'tenant', 'approved', NULL, NULL, '2026-01-01 23:26:50', '2026-01-01 23:26:50', NULL),
+(22, 'Denise Salvador', 'denise.salvador@student.com', 'tenant123', '09191000010', 'tenant', 'approved', NULL, NULL, '2026-01-01 23:26:50', '2026-01-01 23:26:50', NULL),
+(23, 'Tuvween Dela Torre', 'tuv@rentease.com', 'tenant123', NULL, 'owner', 'approved', NULL, 1, '2026-01-02 16:40:44', '2026-01-02 16:40:05', NULL),
+(24, 'Tawade Dela Torre', 'taw@owner.com', 'owner123', NULL, 'owner', 'approved', NULL, 1, '2026-01-02 16:44:02', '2026-01-02 16:43:12', NULL);
 
 -- --------------------------------------------------------
 
@@ -655,7 +769,9 @@ ALTER TABLE `properties`
   ADD PRIMARY KEY (`property_id`),
   ADD KEY `idx_properties_owner` (`owner_id`),
   ADD KEY `idx_properties_location` (`location`),
-  ADD KEY `idx_properties_deleted` (`deleted_at`);
+  ADD KEY `idx_properties_deleted` (`deleted_at`),
+  ADD KEY `idx_properties_status` (`status`),
+  ADD KEY `properties_approved_by_fk` (`approved_by`);
 
 --
 -- Indexes for table `property_amenities`
@@ -719,7 +835,9 @@ ALTER TABLE `users`
   ADD UNIQUE KEY `email` (`email`),
   ADD KEY `idx_users_email` (`email`),
   ADD KEY `idx_users_role` (`role`),
-  ADD KEY `idx_users_deleted` (`deleted_at`);
+  ADD KEY `idx_users_deleted` (`deleted_at`),
+  ADD KEY `idx_users_status` (`status`),
+  ADD KEY `users_approved_by_fk` (`approved_by`);
 
 --
 -- Indexes for table `user_profiles`
@@ -755,7 +873,7 @@ ALTER TABLE `bookings`
 -- AUTO_INCREMENT for table `booking_history`
 --
 ALTER TABLE `booking_history`
-  MODIFY `history_id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `history_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
 
 --
 -- AUTO_INCREMENT for table `lease_agreements`
@@ -791,7 +909,7 @@ ALTER TABLE `payments`
 -- AUTO_INCREMENT for table `payment_receipts`
 --
 ALTER TABLE `payment_receipts`
-  MODIFY `receipt_id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `receipt_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `payment_schedules`
@@ -803,13 +921,13 @@ ALTER TABLE `payment_schedules`
 -- AUTO_INCREMENT for table `properties`
 --
 ALTER TABLE `properties`
-  MODIFY `property_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `property_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `property_amenities`
 --
 ALTER TABLE `property_amenities`
-  MODIFY `amenity_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+  MODIFY `amenity_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=20;
 
 --
 -- AUTO_INCREMENT for table `property_images`
@@ -845,7 +963,7 @@ ALTER TABLE `room_images`
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=25;
 
 --
 -- AUTO_INCREMENT for table `user_profiles`
@@ -939,6 +1057,7 @@ ALTER TABLE `payment_schedules`
 -- Constraints for table `properties`
 --
 ALTER TABLE `properties`
+  ADD CONSTRAINT `properties_approved_by_fk` FOREIGN KEY (`approved_by`) REFERENCES `users` (`user_id`) ON DELETE SET NULL,
   ADD CONSTRAINT `properties_ibfk_1` FOREIGN KEY (`owner_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE;
 
 --
@@ -977,6 +1096,12 @@ ALTER TABLE `room_availability`
 --
 ALTER TABLE `room_images`
   ADD CONSTRAINT `room_images_ibfk_1` FOREIGN KEY (`room_id`) REFERENCES `rooms` (`room_id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `users`
+--
+ALTER TABLE `users`
+  ADD CONSTRAINT `users_approved_by_fk` FOREIGN KEY (`approved_by`) REFERENCES `users` (`user_id`) ON DELETE SET NULL;
 
 --
 -- Constraints for table `user_profiles`

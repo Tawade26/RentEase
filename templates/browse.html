@@ -3,6 +3,9 @@
 {% block title %}Browse Properties - RentEase{% endblock %}
 
 {% block content %}
+<!-- Active Booking Alert (for tenants) -->
+<div id="activeBookingAlert" style="display: none;"></div>
+
 <div class="row mb-4">
     <div class="col-12">
         <h1 class="display-4 mb-3">Find Your Perfect Rental</h1>
@@ -31,6 +34,53 @@
 {% block extra_js %}
 <script>
     let allProperties = [];
+    let hasActiveBooking = false;
+    let activeBookingInfo = null;
+
+    async function checkActiveBooking() {
+        try {
+            const response = await fetch('/api/tenant/active-booking');
+            if (response.ok) {
+                const data = await response.json();
+                hasActiveBooking = data.has_active_booking;
+                activeBookingInfo = data.booking;
+                
+                if (hasActiveBooking) {
+                    displayActiveBookingAlert();
+                }
+            }
+        } catch (error) {
+            console.error('Error checking active booking:', error);
+        }
+    }
+
+    function displayActiveBookingAlert() {
+        const alertDiv = document.getElementById('activeBookingAlert');
+        if (!activeBookingInfo) return;
+        
+        alertDiv.innerHTML = `
+            <div class="alert alert-info alert-dismissible fade show" role="alert">
+                <h5 class="alert-heading">
+                    <i class="bi bi-house-check"></i> You are currently under a property
+                </h5>
+                <hr>
+                <p class="mb-2">
+                    <strong>Property:</strong> ${escapeHtml(activeBookingInfo.property_name)}<br>
+                    <strong>Location:</strong> ${escapeHtml(activeBookingInfo.location)}<br>
+                    <strong>Room Type:</strong> ${escapeHtml(activeBookingInfo.room_type)}<br>
+                    <strong>Monthly Rate:</strong> ₱${parseFloat(activeBookingInfo.monthly_rate).toLocaleString()}<br>
+                    <strong>Start Date:</strong> ${formatDate(activeBookingInfo.start_date)}<br>
+                    ${activeBookingInfo.end_date ? `<strong>End Date:</strong> ${formatDate(activeBookingInfo.end_date)}<br>` : ''}
+                </p>
+                <p class="mb-0">
+                    <small class="text-muted">
+                        <i class="bi bi-info-circle"></i> You cannot book another room while you have an active booking.
+                    </small>
+                </p>
+            </div>
+        `;
+        alertDiv.style.display = 'block';
+    }
 
     async function loadProperties() {
         try {
@@ -86,6 +136,10 @@
     }
 
     function viewProperty(propertyId) {
+        if (hasActiveBooking) {
+            alert('You already have an active booking. You cannot view or book other properties.');
+            return;
+        }
         window.location.href = `/property/${propertyId}`;
     }
 
@@ -112,8 +166,14 @@
         displayProperties(filtered);
     });
 
-    // Load properties on page load
+    // Load properties and check active booking on page load
+    {% if session.logged_in and session.role == 'tenant' %}
+    checkActiveBooking().then(() => {
+        loadProperties();
+    });
+    {% else %}
     loadProperties();
+    {% endif %}
 </script>
 {% endblock %}
 

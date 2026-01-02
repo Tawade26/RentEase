@@ -3,6 +3,7 @@
 {% block title %}Owner Dashboard - RentEase{% endblock %}
 
 {% block extra_css %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css">
 <style>
     .metric-card {
         transition: transform 0.2s;
@@ -13,23 +14,6 @@
     .chart-container {
         position: relative;
         height: 300px;
-    }
-    .todo-item {
-        border-left: 4px solid #dee2e6;
-        transition: all 0.2s;
-    }
-    .todo-item.priority-high {
-        border-left-color: #dc3545;
-    }
-    .todo-item.priority-medium {
-        border-left-color: #ffc107;
-    }
-    .todo-item.priority-low {
-        border-left-color: #28a745;
-    }
-    .todo-item.completed {
-        opacity: 0.6;
-        text-decoration: line-through;
     }
 </style>
 {% endblock %}
@@ -83,6 +67,15 @@
     </div>
 </div>
 
+<!-- Quick Action Button -->
+<div class="row mb-4">
+    <div class="col-12">
+        <a href="/upload-property" class="btn btn-primary btn-lg">
+            <i class="bi bi-plus-circle"></i> Upload New Property
+        </a>
+    </div>
+</div>
+
 <!-- Tabs -->
 <ul class="nav nav-tabs mb-4" id="dashboardTabs" role="tablist">
     <li class="nav-item" role="presentation">
@@ -111,13 +104,13 @@
         </button>
     </li>
     <li class="nav-item" role="presentation">
-        <button class="nav-link" id="todos-tab" data-bs-toggle="tab" data-bs-target="#todos" type="button">
-            <i class="bi bi-check-square"></i> To-Do List
+        <button class="nav-link" id="chat-tab" data-bs-toggle="tab" data-bs-target="#chat" type="button">
+            <i class="bi bi-chat-dots"></i> AI Chat
         </button>
     </li>
     <li class="nav-item" role="presentation">
-        <button class="nav-link" id="chat-tab" data-bs-toggle="tab" data-bs-target="#chat" type="button">
-            <i class="bi bi-chat-dots"></i> AI Chat
+        <button class="nav-link" id="messaging-tab" data-bs-toggle="tab" data-bs-target="#messaging" type="button">
+            <i class="bi bi-envelope"></i> Messaging
         </button>
     </li>
 </ul>
@@ -270,53 +263,29 @@
 
 <!-- Tenants Tab -->
     <div class="tab-pane fade" id="tenants" role="tabpanel">
-        <div class="row" id="tenantsContainer">
-            <div class="col-12 text-center">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- To-Do List Tab -->
-    <div class="tab-pane fade" id="todos" role="tabpanel">
-        <div class="row">
-            <div class="col-md-8">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0"><i class="bi bi-check-square"></i> To-Do List</h5>
-                        <button class="btn btn-sm btn-primary" onclick="showAddTodoModal()">
-                            <i class="bi bi-plus"></i> Add Task
-                        </button>
-                    </div>
-                    <div class="card-body">
-                        <div id="todosContainer">
-                            <div class="text-center">
-                                <div class="spinner-border text-primary" role="status">
-                                    <span class="visually-hidden">Loading...</span>
-                                </div>
+        <div class="table-responsive">
+            <table class="table table-striped table-hover" id="tenantsTable">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Total Bookings</th>
+                        <th>Active Bookings</th>
+                        <th>Properties Rented</th>
+                        <th>Room Types</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="7" class="text-center">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
                             </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-header">
-                        <h6 class="mb-0">Quick Stats</h6>
-                    </div>
-                    <div class="card-body">
-                        <p><strong>Total Tasks:</strong> <span id="todoTotal">0</span></p>
-                        <p><strong>Completed:</strong> <span id="todoCompleted">0</span></p>
-                        <p><strong>Pending:</strong> <span id="todoPending">0</span></p>
-                        <hr>
-                        <p><strong>High Priority:</strong> <span id="todoHigh">0</span></p>
-                        <p><strong>Medium Priority:</strong> <span id="todoMedium">0</span></p>
-                        <p><strong>Low Priority:</strong> <span id="todoLow">0</span></p>
-                    </div>
-                </div>
-            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
     </div>
 
@@ -342,40 +311,43 @@
             </div>
         </div>
     </div>
-</div>
 
-<!-- Add/Edit Todo Modal -->
-<div class="modal fade" id="todoModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="todoModalTitle">Add New Task</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    <!-- Messaging Tab -->
+    <div class="tab-pane fade" id="messaging" role="tabpanel">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-envelope"></i> Messages</h5>
+                <small class="text-muted">Communicate with your tenants</small>
             </div>
-            <div class="modal-body">
-                <form id="todoForm">
-                    <input type="hidden" id="todoId">
-                    <div class="mb-3">
-                        <label for="todoTitle" class="form-label">Title *</label>
-                        <input type="text" class="form-control" id="todoTitle" required>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> Messaging functionality coming soon!
+                </div>
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="list-group" id="conversationsList">
+                            <div class="list-group-item">
+                                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label for="todoDescription" class="form-label">Description</label>
-                        <textarea class="form-control" id="todoDescription" rows="3"></textarea>
+                    <div class="col-md-8">
+                        <div id="messageArea" style="height: 400px; border: 1px solid #dee2e6; padding: 1rem; border-radius: 0.25rem; overflow-y: auto; background-color: #f8f9fa;">
+                            <div class="text-center text-muted">
+                                <i class="bi bi-chat-left-text" style="font-size: 3rem;"></i>
+                                <p class="mt-3">Select a conversation to start messaging</p>
+                            </div>
+                        </div>
+                        <div class="input-group mt-3">
+                            <input type="text" class="form-control" id="messageInput" placeholder="Type a message..." disabled>
+                            <button class="btn btn-primary" id="sendMessageBtn" disabled>
+                                <i class="bi bi-send"></i> Send
+                            </button>
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label for="todoPriority" class="form-label">Priority</label>
-                        <select class="form-select" id="todoPriority">
-                            <option value="low">Low</option>
-                            <option value="medium" selected>Medium</option>
-                            <option value="high">High</option>
-                        </select>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="saveTodo()">Save Task</button>
+                </div>
             </div>
         </div>
     </div>
@@ -383,11 +355,16 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
 <script>
     let allBookings = [];
     let monthlyRevenueChart = null;
     let revenueByPropertyChart = null;
+
+    let tenantsTable = null;
 
     async function loadDashboard() {
         await Promise.all([
@@ -396,8 +373,7 @@
             loadPropertyStatus(),
             loadProperties(),
             loadBookings(),
-            loadTenants(),
-            loadTodos()
+            loadTenants()
         ]);
     }
 
@@ -593,7 +569,14 @@
                 <div class="col-md-6 col-lg-4 mb-4">
                     <div class="card h-100">
                         <div class="card-body">
-                            <h5 class="card-title">${escapeHtml(property.property_name)}</h5>
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <h5 class="card-title mb-0">${escapeHtml(property.property_name)}</h5>
+                                ${property.status ? `
+                                    <span class="badge bg-${property.status === 'approved' ? 'success' : property.status === 'pending' ? 'warning' : 'danger'}">
+                                        ${escapeHtml(property.status)}
+                                    </span>
+                                ` : ''}
+                            </div>
                             <p class="card-text text-muted">
                                 <i class="bi bi-geo-alt"></i> ${escapeHtml(property.location)}
                             </p>
@@ -606,11 +589,20 @@
                                     <i class="bi bi-calendar"></i> ${formatDate(property.date_posted)}
                                 </small>
                             </div>
+                            ${property.status === 'pending' ? `
+                                <div class="alert alert-warning alert-sm mt-2 mb-0 py-2">
+                                    <small><i class="bi bi-clock"></i> Waiting for admin approval</small>
+                                </div>
+                            ` : ''}
                         </div>
                         <div class="card-footer bg-transparent">
-                            <a href="/property/${property.property_id}" class="btn btn-sm btn-outline-primary">
-                                <i class="bi bi-eye"></i> View Details
-                            </a>
+                            ${property.status === 'approved' ? `
+                                <a href="/property/${property.property_id}" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-eye"></i> View Details
+                                </a>
+                            ` : `
+                                <span class="text-muted small">Not yet published</span>
+                            `}
                         </div>
                     </div>
                 </div>
@@ -680,8 +672,36 @@
     }
 
     async function updateBookingStatus(bookingId, status) {
-        // TODO: Implement booking status update endpoint
-        alert(`Booking status update functionality coming soon! Would update booking ${bookingId} to ${status}`);
+        if (!confirm(`Are you sure you want to ${status} this booking?`)) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/owner/bookings/${bookingId}/status`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ status: status })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                alert(`Booking ${status} successfully!`);
+                // Reload bookings, metrics, and property status to reflect changes
+                await Promise.all([
+                    loadBookings(),
+                    loadKeyMetrics(),
+                    loadPropertyStatus()
+                ]);
+            } else {
+                alert('Error: ' + (data.error || 'Failed to update booking status'));
+            }
+        } catch (error) {
+            console.error('Error updating booking status:', error);
+            alert('Error updating booking status. Please try again.');
+        }
     }
 
     async function loadTenants() {
@@ -689,206 +709,40 @@
             const response = await fetch('/api/owner/tenants');
             const tenants = await response.json();
             
-            const container = document.getElementById('tenantsContainer');
+            const tbody = document.querySelector('#tenantsTable tbody');
+            
             if (tenants.length === 0) {
-                container.innerHTML = '<div class="alert alert-info">You don\'t have any tenants yet.</div>';
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center">You don\'t have any tenants yet.</td></tr>';
+                if (tenantsTable) {
+                    tenantsTable.destroy();
+                    tenantsTable = null;
+                }
                 return;
             }
 
-            container.innerHTML = tenants.map(tenant => `
-                <div class="col-md-6 col-lg-4 mb-4">
-                    <div class="card h-100">
-                        <div class="card-body">
-                            <h5 class="card-title">${escapeHtml(tenant.full_name)}</h5>
-                            <p class="card-text">
-                                <i class="bi bi-envelope"></i> ${escapeHtml(tenant.email)}<br>
-                                <i class="bi bi-telephone"></i> ${escapeHtml(tenant.phone_number || 'N/A')}
-                            </p>
-                            <hr>
-                            <p class="card-text small">
-                                <strong>Total Bookings:</strong> ${tenant.total_bookings || 0}<br>
-                                <strong>Active Bookings:</strong> ${tenant.active_bookings || 0}<br>
-                                <strong>Properties:</strong> ${escapeHtml(tenant.properties_rented || 'None')}<br>
-                                <strong>Room Types:</strong> ${escapeHtml(tenant.room_types || 'N/A')}
-                            </p>
-                        </div>
-                    </div>
-                </div>
+            tbody.innerHTML = tenants.map(tenant => `
+                <tr>
+                    <td>${escapeHtml(tenant.full_name)}</td>
+                    <td>${escapeHtml(tenant.email)}</td>
+                    <td>${escapeHtml(tenant.phone_number || 'N/A')}</td>
+                    <td>${tenant.total_bookings || 0}</td>
+                    <td><span class="badge bg-success">${tenant.active_bookings || 0}</span></td>
+                    <td>${escapeHtml(tenant.properties_rented || 'None')}</td>
+                    <td>${escapeHtml(tenant.room_types || 'N/A')}</td>
+                </tr>
             `).join('');
 
-            document.getElementById('totalTenants').textContent = tenants.length;
+            // Initialize or refresh DataTable
+            if (tenantsTable) {
+                tenantsTable.destroy();
+            }
+            tenantsTable = $('#tenantsTable').DataTable({
+                order: [[0, 'asc']],
+                pageLength: 10,
+                responsive: true
+            });
         } catch (error) {
             console.error('Error loading tenants:', error);
-        }
-    }
-
-    // To-Do List Functions
-    async function loadTodos() {
-        try {
-            const response = await fetch('/api/owner/todos');
-            const todos = await response.json();
-            displayTodos(todos);
-        } catch (error) {
-            console.error('Error loading todos:', error);
-        }
-    }
-
-    function displayTodos(todos) {
-        const container = document.getElementById('todosContainer');
-        
-        if (todos.length === 0) {
-            container.innerHTML = '<div class="alert alert-info">No tasks yet. Click "Add Task" to create one!</div>';
-            updateTodoStats(todos);
-            return;
-        }
-        
-        // Sort: incomplete first, then by priority
-        const sortedTodos = [...todos].sort((a, b) => {
-            if (a.completed !== b.completed) return a.completed ? 1 : -1;
-            const priorityOrder = { high: 3, medium: 2, low: 1 };
-            return priorityOrder[b.priority] - priorityOrder[a.priority];
-        });
-        
-        container.innerHTML = sortedTodos.map(todo => `
-            <div class="card mb-2 todo-item priority-${todo.priority} ${todo.completed ? 'completed' : ''}" id="todo-${todo.id}">
-                <div class="card-body">
-                    <div class="form-check d-flex align-items-start">
-                        <input class="form-check-input mt-1" type="checkbox" 
-                               ${todo.completed ? 'checked' : ''} 
-                               onchange="toggleTodo(${todo.id}, this.checked)">
-                        <div class="flex-grow-1 ms-2">
-                            <h6 class="mb-1 ${todo.completed ? 'text-muted' : ''}">${escapeHtml(todo.title)}</h6>
-                            ${todo.description ? `<p class="mb-1 small text-muted">${escapeHtml(todo.description)}</p>` : ''}
-                            <div class="d-flex justify-content-between align-items-center">
-                                <span class="badge bg-${getPriorityColor(todo.priority)}">${todo.priority}</span>
-                                <div>
-                                    <button class="btn btn-sm btn-outline-primary" onclick="editTodo(${todo.id})">
-                                        <i class="bi bi-pencil"></i>
-                                    </button>
-                                    <button class="btn btn-sm btn-outline-danger" onclick="deleteTodo(${todo.id})">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `).join('');
-        
-        updateTodoStats(todos);
-    }
-
-    function updateTodoStats(todos) {
-        const total = todos.length;
-        const completed = todos.filter(t => t.completed).length;
-        const pending = total - completed;
-        const high = todos.filter(t => t.priority === 'high' && !t.completed).length;
-        const medium = todos.filter(t => t.priority === 'medium' && !t.completed).length;
-        const low = todos.filter(t => t.priority === 'low' && !t.completed).length;
-        
-        document.getElementById('todoTotal').textContent = total;
-        document.getElementById('todoCompleted').textContent = completed;
-        document.getElementById('todoPending').textContent = pending;
-        document.getElementById('todoHigh').textContent = high;
-        document.getElementById('todoMedium').textContent = medium;
-        document.getElementById('todoLow').textContent = low;
-    }
-
-    function getPriorityColor(priority) {
-        const colors = { high: 'danger', medium: 'warning', low: 'success' };
-        return colors[priority] || 'secondary';
-    }
-
-    function showAddTodoModal() {
-        document.getElementById('todoModalTitle').textContent = 'Add New Task';
-        document.getElementById('todoForm').reset();
-        document.getElementById('todoId').value = '';
-        new bootstrap.Modal(document.getElementById('todoModal')).show();
-    }
-
-    function editTodo(todoId) {
-        fetch('/api/owner/todos')
-            .then(res => res.json())
-            .then(todos => {
-                const todo = todos.find(t => t.id === todoId);
-                if (todo) {
-                    document.getElementById('todoModalTitle').textContent = 'Edit Task';
-                    document.getElementById('todoId').value = todo.id;
-                    document.getElementById('todoTitle').value = todo.title;
-                    document.getElementById('todoDescription').value = todo.description || '';
-                    document.getElementById('todoPriority').value = todo.priority;
-                    new bootstrap.Modal(document.getElementById('todoModal')).show();
-                }
-            });
-    }
-
-    async function saveTodo() {
-        const todoId = document.getElementById('todoId').value;
-        const title = document.getElementById('todoTitle').value;
-        const description = document.getElementById('todoDescription').value;
-        const priority = document.getElementById('todoPriority').value;
-        
-        if (!title.trim()) {
-            alert('Title is required');
-            return;
-        }
-        
-        try {
-            const url = todoId ? `/api/owner/todos/${todoId}` : '/api/owner/todos';
-            const method = todoId ? 'PUT' : 'POST';
-            const body = todoId ? 
-                { title, description, priority } : 
-                { title, description, priority };
-            
-            const response = await fetch(url, {
-                method: method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
-            });
-            
-            if (response.ok) {
-                bootstrap.Modal.getInstance(document.getElementById('todoModal')).hide();
-                loadTodos();
-            } else {
-                const error = await response.json();
-                alert('Error: ' + (error.error || 'Failed to save task'));
-            }
-        } catch (error) {
-            console.error('Error saving todo:', error);
-            alert('Error saving task');
-        }
-    }
-
-    async function toggleTodo(todoId, completed) {
-        try {
-            const response = await fetch(`/api/owner/todos/${todoId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ completed })
-            });
-            
-            if (response.ok) {
-                loadTodos();
-            }
-        } catch (error) {
-            console.error('Error toggling todo:', error);
-        }
-    }
-
-    async function deleteTodo(todoId) {
-        if (!confirm('Are you sure you want to delete this task?')) return;
-        
-        try {
-            const response = await fetch(`/api/owner/todos/${todoId}`, {
-                method: 'DELETE'
-            });
-            
-            if (response.ok) {
-                loadTodos();
-            }
-        } catch (error) {
-            console.error('Error deleting todo:', error);
         }
     }
 

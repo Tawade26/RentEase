@@ -1,0 +1,397 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Property - RentEase{% endblock %}
+
+{% block extra_css %}
+<style>
+    .room-card {
+        border: 2px dashed #dee2e6;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        background-color: #f8f9fa;
+    }
+    .room-card.active {
+        border-color: #0d6efd;
+        background-color: #e7f1ff;
+    }
+    .amenity-tag {
+        display: inline-block;
+        margin: 0.25rem;
+        padding: 0.25rem 0.75rem;
+        background-color: #e9ecef;
+        border-radius: 20px;
+        font-size: 0.875rem;
+    }
+    .amenity-tag .remove {
+        cursor: pointer;
+        margin-left: 0.5rem;
+        color: #dc3545;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1 class="display-5">Upload New Property</h1>
+        <p class="lead text-muted">Add your property for rent. It will be reviewed by admin before being published.</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-house-door"></i> Property Information</h5>
+            </div>
+            <div class="card-body">
+                <div id="errorAlert" class="alert alert-danger d-none" role="alert"></div>
+                <div id="successAlert" class="alert alert-success d-none" role="alert"></div>
+                
+                <form id="propertyForm">
+                    <div class="mb-3">
+                        <label for="propertyName" class="form-label">Property Name *</label>
+                        <input type="text" class="form-control" id="propertyName" required 
+                               placeholder="e.g., Santos Boarding House">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="location" class="form-label">Location *</label>
+                        <input type="text" class="form-control" id="location" required 
+                               placeholder="e.g., Manila, Metro Manila">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" rows="4" 
+                                  placeholder="Describe your property..."></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Amenities</label>
+                        <div class="input-group mb-2">
+                            <input type="text" class="form-control" id="amenityInput" 
+                                   placeholder="Add amenity (e.g., WiFi, Parking)">
+                            <button type="button" class="btn btn-outline-secondary" onclick="addAmenity()">
+                                <i class="bi bi-plus"></i> Add
+                            </button>
+                        </div>
+                        <div id="amenitiesList" class="mb-2">
+                            <!-- Amenities will be added here -->
+                        </div>
+                        <small class="text-muted">Common amenities: WiFi, Parking, Laundry Area, 24/7 Security, Study Area</small>
+                    </div>
+                    
+                    <hr class="my-4">
+                    
+                    <h5 class="mb-3"><i class="bi bi-door-open"></i> Rooms</h5>
+                    <div id="roomsContainer">
+                        <!-- Rooms will be added here -->
+                    </div>
+                    <button type="button" class="btn btn-outline-primary" onclick="addRoomForm()">
+                        <i class="bi bi-plus-circle"></i> Add Room
+                    </button>
+                    
+                    <hr class="my-4">
+                    
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> 
+                        <strong>Note:</strong> Your property will be submitted for admin approval. 
+                        It will appear on the browsing page once approved.
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="bi bi-upload"></i> Submit Property for Approval
+                        </button>
+                        <a href="/owner-dashboard" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left"></i> Back to Dashboard
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">Pending Properties</h6>
+            </div>
+            <div class="card-body">
+                <div id="pendingPropertiesList">
+                    <div class="text-center">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let amenities = [];
+    let rooms = [];
+    let currentPropertyId = null;
+    
+    // Load pending properties
+    async function loadPendingProperties() {
+        try {
+            const response = await fetch('/api/owner/pending-properties');
+            const properties = await response.json();
+            
+            const container = document.getElementById('pendingPropertiesList');
+            if (properties.length === 0) {
+                container.innerHTML = '<p class="text-muted small mb-0">No pending properties.</p>';
+                return;
+            }
+            
+            container.innerHTML = properties.map(prop => `
+                <div class="mb-3 p-2 border rounded">
+                    <strong>${escapeHtml(prop.property_name)}</strong><br>
+                    <small class="text-muted">${escapeHtml(prop.location)}</small><br>
+                    <span class="badge bg-warning">Pending Approval</span>
+                </div>
+            `).join('');
+        } catch (error) {
+            console.error('Error loading pending properties:', error);
+        }
+    }
+    
+    function addAmenity() {
+        const input = document.getElementById('amenityInput');
+        const amenity = input.value.trim();
+        
+        if (amenity && !amenities.includes(amenity)) {
+            amenities.push(amenity);
+            updateAmenitiesDisplay();
+            input.value = '';
+        }
+    }
+    
+    function removeAmenity(amenity) {
+        amenities = amenities.filter(a => a !== amenity);
+        updateAmenitiesDisplay();
+    }
+    
+    function updateAmenitiesDisplay() {
+        const container = document.getElementById('amenitiesList');
+        if (amenities.length === 0) {
+            container.innerHTML = '<p class="text-muted small mb-0">No amenities added yet.</p>';
+            return;
+        }
+        
+        container.innerHTML = amenities.map(amenity => `
+            <span class="amenity-tag">
+                ${escapeHtml(amenity)}
+                <span class="remove" onclick="removeAmenity('${escapeHtml(amenity)}')">×</span>
+            </span>
+        `).join('');
+    }
+    
+    function addRoomForm() {
+        const roomId = Date.now();
+        rooms.push({
+            id: roomId,
+            room_type: 'Single',
+            monthly_rate: '',
+            description: '',
+            total_tenants: 1,
+            house_rules: ''
+        });
+        renderRooms();
+    }
+    
+    function removeRoom(roomId) {
+        rooms = rooms.filter(r => r.id !== roomId);
+        renderRooms();
+    }
+    
+    function renderRooms() {
+        const container = document.getElementById('roomsContainer');
+        
+        if (rooms.length === 0) {
+            container.innerHTML = '<p class="text-muted">No rooms added yet. Click "Add Room" to get started.</p>';
+            return;
+        }
+        
+        container.innerHTML = rooms.map((room, index) => `
+            <div class="room-card" id="room-${room.id}">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="mb-0">Room ${index + 1}</h6>
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRoom(${room.id})">
+                        <i class="bi bi-trash"></i> Remove
+                    </button>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Room Type *</label>
+                        <select class="form-select" onchange="updateRoom(${room.id}, 'room_type', this.value)" required>
+                            <option value="Single" ${room.room_type === 'Single' ? 'selected' : ''}>Single</option>
+                            <option value="Shared" ${room.room_type === 'Shared' ? 'selected' : ''}>Shared</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Monthly Rate (₱) *</label>
+                        <input type="number" class="form-control" 
+                               onchange="updateRoom(${room.id}, 'monthly_rate', this.value)"
+                               value="${room.monthly_rate}" 
+                               min="0" step="0.01" required>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Total Capacity</label>
+                    <input type="number" class="form-control" 
+                           onchange="updateRoom(${room.id}, 'total_tenants', this.value)"
+                           value="${room.total_tenants}" 
+                           min="1" required>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Description</label>
+                    <textarea class="form-control" rows="2" 
+                              onchange="updateRoom(${room.id}, 'description', this.value)"
+                              placeholder="Room description...">${escapeHtml(room.description)}</textarea>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">House Rules</label>
+                    <textarea class="form-control" rows="2" 
+                              onchange="updateRoom(${room.id}, 'house_rules', this.value)"
+                              placeholder="e.g., No smoking, No pets, Quiet hours...">${escapeHtml(room.house_rules)}</textarea>
+                </div>
+            </div>
+        `).join('');
+    }
+    
+    function updateRoom(roomId, field, value) {
+        const room = rooms.find(r => r.id === roomId);
+        if (room) {
+            room[field] = value;
+        }
+    }
+    
+    document.getElementById('amenityInput')?.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            addAmenity();
+        }
+    });
+    
+    document.getElementById('propertyForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const errorAlert = document.getElementById('errorAlert');
+        const successAlert = document.getElementById('successAlert');
+        
+        errorAlert.classList.add('d-none');
+        successAlert.classList.add('d-none');
+        
+        // Validate rooms
+        if (rooms.length === 0) {
+            errorAlert.textContent = 'Please add at least one room.';
+            errorAlert.classList.remove('d-none');
+            return;
+        }
+        
+        // Validate room data
+        for (let room of rooms) {
+            if (!room.monthly_rate || parseFloat(room.monthly_rate) <= 0) {
+                errorAlert.textContent = 'Please enter valid monthly rate for all rooms.';
+                errorAlert.classList.remove('d-none');
+                return;
+            }
+        }
+        
+        try {
+            // Create property first
+            const propertyData = {
+                property_name: document.getElementById('propertyName').value.trim(),
+                location: document.getElementById('location').value.trim(),
+                description: document.getElementById('description').value.trim(),
+                amenities: amenities
+            };
+            
+            const propertyResponse = await fetch('/api/owner/create-property', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(propertyData)
+            });
+            
+            const propertyResult = await propertyResponse.json();
+            
+            if (!propertyResponse.ok) {
+                throw new Error(propertyResult.error || 'Failed to create property');
+            }
+            
+            currentPropertyId = propertyResult.property_id;
+            
+            // Add rooms
+            for (let room of rooms) {
+                const roomResponse = await fetch('/api/owner/add-room', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        property_id: currentPropertyId,
+                        room_type: room.room_type,
+                        monthly_rate: parseFloat(room.monthly_rate),
+                        description: room.description,
+                        total_tenants: parseInt(room.total_tenants),
+                        house_rules: room.house_rules
+                    })
+                });
+                
+                if (!roomResponse.ok) {
+                    const roomError = await roomResponse.json();
+                    throw new Error(roomError.error || 'Failed to add room');
+                }
+            }
+            
+            // Success
+            successAlert.textContent = 'Property submitted successfully! Waiting for admin approval.';
+            successAlert.classList.remove('d-none');
+            
+            // Reset form
+            document.getElementById('propertyForm').reset();
+            amenities = [];
+            rooms = [];
+            updateAmenitiesDisplay();
+            renderRooms();
+            
+            // Reload pending properties
+            loadPendingProperties();
+            
+            // Scroll to top
+            window.scrollTo(0, 0);
+            
+        } catch (error) {
+            errorAlert.textContent = 'Error: ' + error.message;
+            errorAlert.classList.remove('d-none');
+        }
+    });
+    
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    // Initialize
+    updateAmenitiesDisplay();
+    renderRooms();
+    loadPendingProperties();
+</script>
+{% endblock %}
+
