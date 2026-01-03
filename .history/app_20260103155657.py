@@ -675,7 +675,7 @@ def logout():
     return jsonify({'success': True, 'message': 'Logged out successfully'})
 
 @app.route('/api/tenant/active-booking', methods=['GET'])
-@require_login 
+@require_login
 def get_tenant_active_booking():
     """Check if tenant has an active booking"""
     try:
