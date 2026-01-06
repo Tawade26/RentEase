@@ -3,6 +3,9 @@
 {% block title %}Messaging - RentEase{% endblock %}
 
 {% block content %}
+<!-- Active Booking Alert (for tenants) -->
+<div id="activeBookingAlert" style="display: none;"></div>
+
 <div class="row mb-4">
     <div class="col-12">
         <h1 class="display-4 mb-3">Messages</h1>
@@ -16,17 +19,9 @@
         <small class="text-muted">Communicate with property owners</small>
     </div>
     <div class="card-body">
-        <div class="alert alert-info">
-            <i class="bi bi-info-circle"></i> Messaging functionality coming soon!
-        </div>
         <div class="row">
             <div class="col-md-4">
                 <div class="list-group" id="conversationsList">
-                    <div class="list-group-item">
-                        <div class="spinner-border spinner-border-sm text-primary" role="status">
-                            <span class="visually-hidden">Loading...</span>
-                        </div>
-                    </div>
                 </div>
             </div>
             <div class="col-md-8">
@@ -50,22 +45,14 @@
 
 {% block extra_js %}
 <script>
-    // Get owner_id from URL if present (from quick chat button)
-    const urlParams = new URLSearchParams(window.location.search);
-    const ownerId = urlParams.get('owner_id');
-    
-    if (ownerId) {
-        // If owner_id is in URL, show a message about starting conversation
-        document.addEventListener('DOMContentLoaded', function() {
-            const messageArea = document.getElementById('messageArea');
-            messageArea.innerHTML = `
-                <div class="alert alert-info">
-                    <i class="bi bi-info-circle"></i> 
-                    Ready to start a conversation with this owner. Messaging functionality coming soon!
-                </div>
-            `;
-        });
-    }
+    // Check active booking on page load (for tenants)
+    {% if session.logged_in and session.role == 'tenant' %}
+    checkActiveBooking().then((data) => {
+        if (data.has_active_booking) {
+            displayActiveBookingAlert('activeBookingAlert');
+        }
+    });
+    {% endif %}
 </script>
 {% endblock %}
 

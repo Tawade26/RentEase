@@ -16,7 +16,6 @@
 <script>
     const propertyId = {{ property_id }};
     let isLoggedIn = false;
-    let hasActiveBooking = false;
 
     async function checkLoginStatus() {
         try {
@@ -152,7 +151,7 @@
                                             ` : ''}
                                         </div>
                                         <div class="card-footer bg-transparent">
-                                            ${hasActiveBooking ? `
+                                            ${globalHasActiveBooking ? `
                                                 <button class="btn btn-secondary w-100" disabled>
                                                     <i class="bi bi-exclamation-triangle"></i> You already have an active booking
                                                 </button>
@@ -194,7 +193,7 @@
             return;
         }
         
-        if (hasActiveBooking) {
+        if (globalHasActiveBooking) {
             alert('You already have an active booking. You cannot book another room.');
             return;
         }
@@ -243,12 +242,6 @@
         }
     }
 
-    function escapeHtml(text) {
-        if (!text) return '';
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
 
     // Initialize
     checkLoginStatus().then(() => {

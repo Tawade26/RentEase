@@ -12,7 +12,7 @@
 
 <!-- Stats Cards -->
 <div class="row mb-4" id="adminStats">
-    <div class="col-md-3 mb-3">
+    <div class="col-md-6 mb-3">
         <div class="card text-center border-warning">
             <div class="card-body">
                 <h5 class="card-title">Pending Users</h5>
@@ -20,7 +20,7 @@
             </div>
         </div>
     </div>
-    <div class="col-md-3 mb-3">
+    <div class="col-md-6 mb-3">
         <div class="card text-center border-info">
             <div class="card-body">
                 <h5 class="card-title">Role Requests</h5>
@@ -28,7 +28,7 @@
             </div>
         </div>
     </div>
-    <div class="col-md-3 mb-3">
+    <div class="col-md-6 mb-3">
         <div class="card text-center border-primary">
             <div class="card-body">
                 <h5 class="card-title">Total Users</h5>
@@ -36,7 +36,7 @@
             </div>
         </div>
     </div>
-    <div class="col-md-3 mb-3">
+    <div class="col-md-6 mb-3">
         <div class="card text-center border-success">
             <div class="card-body">
                 <h5 class="card-title">Approved Users</h5>
@@ -441,18 +441,6 @@
         }
     }
 
-    function escapeHtml(text) {
-        if (!text) return '';
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
-    function formatDate(dateString) {
-        if (!dateString) return 'N/A';
-        const date = new Date(dateString);
-        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-    }
 
     // Load dashboard on page load
     loadAdminDashboard();

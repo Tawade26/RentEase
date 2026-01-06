@@ -20,15 +20,22 @@
 
 {% block content %}
 <div class="row mb-4">
-    <div class="col-12">
-        <h1 class="display-4">Owner Dashboard</h1>
-        <p class="lead text-muted">Manage your properties, bookings, and tenants</p>
+    <div class="col-12 d-flex justify-content-between align-items-center">
+        <div>
+            <h1 class="display-4 mb-0">Owner Dashboard</h1>
+            <p class="lead text-muted mb-0">Manage your properties, bookings, and tenants</p>
+        </div>
+        <div>
+            <a href="/upload-property" class="btn btn-primary btn-lg">
+                <i class="bi bi-plus-circle"></i> Upload New Property
+            </a>
+        </div>
     </div>
 </div>
 
 <!-- Key Metrics Cards -->
 <div class="row mb-4" id="keyMetrics">
-    <div class="col-md-3 mb-3">
+    <div class="col-md-6 mb-3">
         <div class="card text-center metric-card border-primary">
             <div class="card-body">
                 <i class="bi bi-house-door text-primary" style="font-size: 2rem;"></i>
@@ -37,17 +44,16 @@
             </div>
         </div>
     </div>
-    <div class="col-md-3 mb-3">
+    <div class="col-md-6 mb-3">
         <div class="card text-center metric-card border-info">
             <div class="card-body">
                 <i class="bi bi-door-open text-info" style="font-size: 2rem;"></i>
                 <h5 class="card-title mt-2">Occupancy Rate</h5>
                 <h2 class="text-info mb-0" id="metricOccupancy">-</h2>
-                <small class="text-muted" id="metricOccupancyDetail">-</small>
             </div>
         </div>
     </div>
-    <div class="col-md-3 mb-3">
+    <div class="col-md-6 mb-3">
         <div class="card text-center metric-card border-success">
             <div class="card-body">
                 <i class="bi bi-people text-success" style="font-size: 2rem;"></i>
@@ -56,7 +62,7 @@
             </div>
         </div>
     </div>
-    <div class="col-md-3 mb-3">
+    <div class="col-md-6 mb-3">
         <div class="card text-center metric-card border-warning">
             <div class="card-body">
                 <i class="bi bi-exclamation-triangle text-warning" style="font-size: 2rem;"></i>
@@ -64,15 +70,6 @@
                 <h2 class="text-warning mb-0" id="metricPending">-</h2>
             </div>
         </div>
-    </div>
-</div>
-
-<!-- Quick Action Button -->
-<div class="row mb-4">
-    <div class="col-12">
-        <a href="/upload-property" class="btn btn-primary btn-lg">
-            <i class="bi bi-plus-circle"></i> Upload New Property
-        </a>
     </div>
 </div>
 
@@ -131,7 +128,6 @@
                                 <th>Available</th>
                                 <th>Occupied</th>
                                 <th>Occupancy Rate</th>
-                                <th>Active Bookings</th>
                                 <th>Pending</th>
                                 <th>Avg Rating</th>
                                 <th>Actions</th>
@@ -139,7 +135,7 @@
                         </thead>
                         <tbody id="propertyStatusTableBody">
                             <tr>
-                                <td colspan="10" class="text-center">
+                                <td colspan="9" class="text-center">
                                     <div class="spinner-border text-primary" role="status">
                                         <span class="visually-hidden">Loading...</span>
                                     </div>
@@ -274,11 +270,12 @@
                         <th>Active Bookings</th>
                         <th>Properties Rented</th>
                         <th>Room Types</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr>
-                        <td colspan="7" class="text-center">
+                        <td colspan="8" class="text-center">
                             <div class="spinner-border text-primary" role="status">
                                 <span class="visually-hidden">Loading...</span>
                             </div>
@@ -291,67 +288,104 @@
 
     <!-- Tenant AI Chat Tab -->
     <div class="tab-pane fade" id="chat" role="tabpanel">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-robot"></i> Tenant Information Assistant</h5>
-                <small class="text-muted">Ask questions about your tenants</small>
+        <div id="tenantChatMessages" style="height: 400px; overflow-y: auto; border: 1px solid #dee2e6; padding: 1rem; margin-bottom: 1rem; border-radius: 0.25rem; background-color: #f8f9fa;">
+            <div class="message assistant">
+                <strong>AI:</strong> Hello! I'm your property management AI assistant. I can help you analyze your properties, tenants, bookings, and financial data. What would you like to know?
             </div>
-            <div class="card-body">
-                <div id="tenantChatMessages" style="height: 400px; overflow-y: auto; border: 1px solid #dee2e6; padding: 1rem; margin-bottom: 1rem; border-radius: 0.25rem;">
-                    <div class="message assistant">
-                        <strong>AI:</strong> Hello! I can help you understand your tenants' information, booking history, and statistics. What would you like to know?
+        </div>
+        <div class="input-group">
+            <input type="text" class="form-control" id="tenantChatInput" placeholder="Ask about your tenants...">
+            <button class="btn btn-primary" onclick="sendTenantChatMessage()">
+                <i class="bi bi-send"></i> Send
+            </button>
+        </div>
+    </div>
+
+    <!-- Messaging Tab -->
+    <div class="tab-pane fade" id="messaging" role="tabpanel">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="list-group" id="conversationsList">
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div id="messageArea" style="height: 400px; border: 1px solid #dee2e6; padding: 1rem; border-radius: 0.25rem; overflow-y: auto; background-color: #f8f9fa;">
+                    <div class="text-center text-muted">
+                        <i class="bi bi-chat-left-text" style="font-size: 3rem;"></i>
+                        <p class="mt-3">Select a conversation to start messaging</p>
                     </div>
                 </div>
-                <div class="input-group">
-                    <input type="text" class="form-control" id="tenantChatInput" placeholder="Ask about your tenants...">
-                    <button class="btn btn-primary" onclick="sendTenantChatMessage()">
+                <div class="input-group mt-3">
+                    <input type="text" class="form-control" id="messageInput" placeholder="Type a message..." disabled>
+                    <button class="btn btn-primary" id="sendMessageBtn" disabled>
                         <i class="bi bi-send"></i> Send
                     </button>
                 </div>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Messaging Tab -->
-    <div class="tab-pane fade" id="messaging" role="tabpanel">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-envelope"></i> Messages</h5>
-                <small class="text-muted">Communicate with your tenants</small>
+<!-- Payment Modal -->
+<div class="modal fade" id="paymentModal" tabindex="-1" aria-labelledby="paymentModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="paymentModalLabel">Add Payment</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="card-body">
-                <div class="alert alert-info">
-                    <i class="bi bi-info-circle"></i> Messaging functionality coming soon!
-                </div>
-                <div class="row">
-                    <div class="col-md-4">
-                        <div class="list-group" id="conversationsList">
-                            <div class="list-group-item">
-                                <div class="spinner-border spinner-border-sm text-primary" role="status">
-                                    <span class="visually-hidden">Loading...</span>
-                                </div>
-                            </div>
-                        </div>
+            <div class="modal-body">
+                <form id="paymentForm">
+                    <input type="hidden" id="paymentTenantId" name="tenant_id">
+                    <div class="mb-3">
+                        <label class="form-label">Tenant</label>
+                        <input type="text" class="form-control" id="paymentTenantName" readonly>
                     </div>
-                    <div class="col-md-8">
-                        <div id="messageArea" style="height: 400px; border: 1px solid #dee2e6; padding: 1rem; border-radius: 0.25rem; overflow-y: auto; background-color: #f8f9fa;">
-                            <div class="text-center text-muted">
-                                <i class="bi bi-chat-left-text" style="font-size: 3rem;"></i>
-                                <p class="mt-3">Select a conversation to start messaging</p>
-                            </div>
-                        </div>
-                        <div class="input-group mt-3">
-                            <input type="text" class="form-control" id="messageInput" placeholder="Type a message..." disabled>
-                            <button class="btn btn-primary" id="sendMessageBtn" disabled>
-                                <i class="bi bi-send"></i> Send
-                            </button>
-                        </div>
+                    <div class="mb-3">
+                        <label for="paymentBookingId" class="form-label">Booking <span class="text-danger">*</span></label>
+                        <select class="form-select" id="paymentBookingId" name="booking_id" required>
+                            <option value="">Loading bookings...</option>
+                        </select>
+                        <small class="form-text text-muted">Select the booking for this payment</small>
                     </div>
-                </div>
+                    <div class="mb-3">
+                        <label for="paymentAmount" class="form-label">Amount (₱) <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" id="paymentAmount" name="amount_paid" step="0.01" min="0.01" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="paymentDate" class="form-label">Payment Date</label>
+                        <input type="date" class="form-control" id="paymentDate" name="payment_date">
+                        <small class="form-text text-muted">Leave empty to use today's date</small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="paymentMethod" class="form-label">Payment Method</label>
+                        <select class="form-select" id="paymentMethod" name="payment_method">
+                            <option value="Manual Entry" selected>Manual Entry</option>
+                            <option value="Cash">Cash</option>
+                            <option value="Bank Transfer">Bank Transfer</option>
+                            <option value="GCash">GCash</option>
+                            <option value="PayMaya">PayMaya</option>
+                            <option value="Check">Check</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="paymentStatus" class="form-label">Status</label>
+                        <select class="form-select" id="paymentStatus" name="status">
+                            <option value="confirmed" selected>Confirmed</option>
+                            <option value="pending">Pending</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitPayment()">Add Payment</button>
             </div>
         </div>
     </div>
 </div>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -365,6 +399,7 @@
     let revenueByPropertyChart = null;
 
     let tenantsTable = null;
+    let bookingsTable = null;
 
     async function loadDashboard() {
         await Promise.all([
@@ -384,8 +419,6 @@
             
             document.getElementById('metricProperties').textContent = metrics.total_properties;
             document.getElementById('metricOccupancy').textContent = metrics.occupancy_rate + '%';
-            document.getElementById('metricOccupancyDetail').textContent = 
-                `${metrics.occupied_rooms} / ${metrics.total_rooms} rooms`;
             document.getElementById('metricTenants').textContent = metrics.total_tenants;
             document.getElementById('metricPending').textContent = metrics.pending_bookings;
         } catch (error) {
@@ -512,7 +545,7 @@
             const tbody = document.getElementById('propertyStatusTableBody');
             
             if (properties.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="10" class="text-center">No properties found.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="9" class="text-center">No properties found.</td></tr>';
                 return;
             }
             
@@ -534,7 +567,6 @@
                             </div>
                         </div>
                     </td>
-                    <td><span class="badge bg-primary">${prop.active_bookings}</span></td>
                     <td><span class="badge bg-warning">${prop.pending_bookings}</span></td>
                     <td>
                         ${prop.avg_rating > 0 ? `
@@ -630,6 +662,10 @@
         
         if (bookings.length === 0) {
             tbody.innerHTML = '<tr><td colspan="7" class="text-center">No bookings found.</td></tr>';
+            if (bookingsTable) {
+                bookingsTable.destroy();
+                bookingsTable = null;
+            }
             return;
         }
 
@@ -657,18 +693,29 @@
             </tr>
         `).join('');
 
+        // Initialize or refresh DataTable
+        if (bookingsTable) {
+            bookingsTable.destroy();
+        }
+        bookingsTable = $('#bookingsTable').DataTable({
+            order: [[3, 'desc']], // Sort by start date descending
+            pageLength: 10,
+            responsive: true
+        });
+
         document.getElementById('totalBookings').textContent = allBookings.length;
         document.getElementById('pendingBookings').textContent = allBookings.filter(b => b.status === 'pending').length;
     }
 
     function filterBookings() {
         const filter = document.getElementById('bookingFilter').value;
+        let filtered;
         if (filter === 'all') {
-            displayBookings(allBookings);
+            filtered = allBookings;
         } else {
-            const filtered = allBookings.filter(b => b.status === filter);
-            displayBookings(filtered);
+            filtered = allBookings.filter(b => b.status === filter);
         }
+        displayBookings(filtered);
     }
 
     async function updateBookingStatus(bookingId, status) {
@@ -712,7 +759,7 @@
             const tbody = document.querySelector('#tenantsTable tbody');
             
             if (tenants.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" class="text-center">You don\'t have any tenants yet.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center">You don\'t have any tenants yet.</td></tr>';
                 if (tenantsTable) {
                     tenantsTable.destroy();
                     tenantsTable = null;
@@ -722,13 +769,19 @@
 
             tbody.innerHTML = tenants.map(tenant => `
                 <tr>
-                    <td>${escapeHtml(tenant.full_name)}</td>
+                    <td>
+                        ${escapeHtml(tenant.full_name)}
+                        <button class="btn btn-sm btn-primary ms-2" onclick="openPaymentModal(${tenant.tenant_id}, '${escapeHtml(tenant.full_name)}')" title="Add Payment">
+                            <i class="bi bi-cash-coin"></i> Add Payment
+                        </button>
+                    </td>
                     <td>${escapeHtml(tenant.email)}</td>
                     <td>${escapeHtml(tenant.phone_number || 'N/A')}</td>
                     <td>${tenant.total_bookings || 0}</td>
                     <td><span class="badge bg-success">${tenant.active_bookings || 0}</span></td>
                     <td>${escapeHtml(tenant.properties_rented || 'None')}</td>
                     <td>${escapeHtml(tenant.room_types || 'N/A')}</td>
+                    <td>-</td>
                 </tr>
             `).join('');
 
@@ -762,6 +815,14 @@
         input.value = '';
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
 
+        // Show loading indicator
+        const loadingMsg = document.createElement('div');
+        loadingMsg.className = 'message assistant';
+        loadingMsg.id = 'loadingMsg';
+        loadingMsg.innerHTML = `<strong>AI:</strong> <em>Analyzing data...</em>`;
+        messagesDiv.appendChild(loadingMsg);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
         // Send to API
         try {
             const response = await fetch('/api/owner/tenant-chat', {
@@ -774,12 +835,35 @@
             
             const data = await response.json();
             
+            // Remove loading message
+            const loading = document.getElementById('loadingMsg');
+            if (loading) loading.remove();
+            
             const aiMsg = document.createElement('div');
             aiMsg.className = 'message assistant';
-            aiMsg.innerHTML = `<strong>AI:</strong> ${escapeHtml(data.response || data.error || 'Sorry, I encountered an error.')}`;
+            // Format the response: convert line breaks and markdown to HTML
+            let responseText = data.response || data.error || 'Sorry, I encountered an error.';
+            // First, convert markdown to HTML (before escaping)
+            responseText = responseText
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold markdown
+                .replace(/\*(?![*])(.*?)\*/g, '<em>$1</em>'); // Italic markdown (not bold)
+            // Escape HTML to prevent XSS
+            responseText = escapeHtml(responseText);
+            // Convert escaped <br> back to actual <br> tags, and convert \n to <br>
+            responseText = responseText
+                .replace(/&lt;br&gt;/g, '<br>')
+                .replace(/\\n/g, '<br>')
+                .replace(/\n/g, '<br>')
+                .replace(/&lt;strong&gt;(.*?)&lt;\/strong&gt;/g, '<strong>$1</strong>')
+                .replace(/&lt;em&gt;(.*?)&lt;\/em&gt;/g, '<em>$1</em>');
+            aiMsg.innerHTML = `<strong>AI:</strong> ${responseText}`;
             messagesDiv.appendChild(aiMsg);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
         } catch (error) {
+            // Remove loading message
+            const loading = document.getElementById('loadingMsg');
+            if (loading) loading.remove();
+            
             const aiMsg = document.createElement('div');
             aiMsg.className = 'message assistant';
             aiMsg.innerHTML = `<strong>AI:</strong> Sorry, I encountered an error. Please try again.`;
@@ -805,17 +889,100 @@
         return colors[status] || 'secondary';
     }
 
-    function escapeHtml(text) {
-        if (!text) return '';
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+
+    // Payment Modal Functions
+    async function openPaymentModal(tenantId, tenantName) {
+        document.getElementById('paymentTenantId').value = tenantId;
+        document.getElementById('paymentTenantName').value = tenantName;
+        
+        const bookingSelect = document.getElementById('paymentBookingId');
+        bookingSelect.innerHTML = '<option value="">Loading bookings...</option>';
+        
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('paymentModal'));
+        modal.show();
+        
+        // Load bookings for this tenant
+        try {
+            const response = await fetch(`/api/owner/tenants/${tenantId}/bookings`);
+            const bookings = await response.json();
+            
+            if (bookings.length === 0) {
+                bookingSelect.innerHTML = '<option value="">No approved bookings found for this tenant</option>';
+                bookingSelect.disabled = true;
+                return;
+            }
+            
+            bookingSelect.innerHTML = '<option value="">Select a booking...</option>';
+            bookings.forEach(booking => {
+                const option = document.createElement('option');
+                option.value = booking.booking_id;
+                option.textContent = `${booking.property_name} - ${booking.room_type} (₱${booking.monthly_rate}/month) - ${formatDate(booking.start_date)}`;
+                option.dataset.roomId = booking.room_id;
+                bookingSelect.appendChild(option);
+            });
+            bookingSelect.disabled = false;
+        } catch (error) {
+            console.error('Error loading bookings:', error);
+            bookingSelect.innerHTML = '<option value="">Error loading bookings</option>';
+            bookingSelect.disabled = true;
+        }
+        
+        // Set today's date as default
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('paymentDate').value = today;
     }
 
-    function formatDate(dateString) {
-        if (!dateString) return 'N/A';
-        const date = new Date(dateString);
-        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    async function submitPayment() {
+        const form = document.getElementById('paymentForm');
+        const formData = new FormData(form);
+        
+        // Validate required fields
+        const bookingId = formData.get('booking_id');
+        const amount = formData.get('amount_paid');
+        
+        if (!bookingId || !amount) {
+            alert('Please fill in all required fields');
+            return;
+        }
+        
+        // Prepare payment data
+        const paymentData = {
+            booking_id: parseInt(bookingId),
+            tenant_id: parseInt(formData.get('tenant_id')),
+            amount_paid: parseFloat(amount),
+            payment_date: formData.get('payment_date') || null,
+            payment_method: formData.get('payment_method') || 'Manual Entry',
+            status: formData.get('status') || 'confirmed'
+        };
+        
+        try {
+            const response = await fetch('/api/owner/payments', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(paymentData)
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                alert('Payment added successfully!');
+                // Close modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('paymentModal'));
+                modal.hide();
+                // Reset form
+                form.reset();
+                // Reload financial data
+                loadFinancialOverview();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to add payment'));
+            }
+        } catch (error) {
+            console.error('Error submitting payment:', error);
+            alert('Error submitting payment. Please try again.');
+        }
     }
 
     // Load dashboard on page load

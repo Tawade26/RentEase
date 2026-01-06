@@ -6,23 +6,29 @@
     <title>{% block title %}RentEase{% endblock %}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary-color: #4a90e2;
+            --primary-color: #132440;
             --secondary-color: #50c878;
             --danger-color: #e74c3c;
-            --dark-color: #2c3e50;
+            --dark-color: #132440;
+            --navbar-color: #132440;
         }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: #f8f9fa;
         }
         .navbar {
-            background: linear-gradient(135deg, var(--primary-color), #357abd);
+            background-color: var(--navbar-color);
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 1rem 0;
         }
         .navbar-brand {
-            font-weight: bold;
+            font-family: 'Poppins', sans-serif;
+            font-weight: 700;
             font-size: 1.5rem;
         }
         .btn-primary {
@@ -30,8 +36,27 @@
             border-color: var(--primary-color);
         }
         .btn-primary:hover {
-            background-color: #357abd;
-            border-color: #357abd;
+            background-color: #1a3a5a;
+            border-color: #1a3a5a;
+        }
+        /* Bootstrap primary color overrides */
+        .text-primary {
+            color: var(--primary-color) !important;
+        }
+        .bg-primary {
+            background-color: var(--primary-color) !important;
+        }
+        .border-primary {
+            border-color: var(--primary-color) !important;
+        }
+        .btn-outline-primary {
+            color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        .btn-outline-primary:hover {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+            color: white;
         }
         .card {
             border: none;
@@ -61,7 +86,7 @@
             right: 0;
         }
         .chat-header {
-            background: var(--primary-color);
+            background: var(--navbar-color);
             color: white;
             padding: 1rem;
             display: flex;
@@ -83,12 +108,61 @@
             border-radius: 8px;
         }
         .message.user {
-            background-color: #e3f2fd;
+            background-color: rgba(19, 36, 64, 0.1);
             margin-left: 20%;
         }
         .message.assistant {
             background-color: #f5f5f5;
             margin-right: 20%;
+        }
+        .hero-header {
+            position: relative;
+            background-image: url('/imges/browse_front.png');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            min-height: 400px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 2rem;
+        }
+        .hero-header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(19, 36, 64, 0.5);
+            z-index: 1;
+        }
+        .hero-content {
+            position: relative;
+            z-index: 2;
+            text-align: left;
+            color: white;
+            width: 100%;
+            padding: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+        }
+        .hero-title {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 700;
+            font-size: 3rem;
+            margin-bottom: 1.5rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        .hero-search {
+            max-width: 800px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 2;
+        }
+        .hero-search .input-group {
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         }
     </style>
     {% block extra_css %}{% endblock %}
@@ -97,7 +171,7 @@
     <nav class="navbar navbar-expand-lg navbar-dark">
         <div class="container">
             <a class="navbar-brand" href="/">
-                <i class="bi bi-house-door"></i> RentEase
+                RentEase
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
@@ -140,13 +214,16 @@
                     </li>
                     {% else %}
                     <li class="nav-item">
-                        <a class="btn btn-outline-light btn-sm" href="/login">Sign In</a>
+                        <a class="btn btn-outline-light btn-sm" href="/login">Log In</a>
                     </li>
                     {% endif %}
                 </ul>
             </div>
         </div>
     </nav>
+
+    <!-- Hero Header Section -->
+    {% block hero_header %}{% endblock %}
 
     <main class="container my-4">
         {% block content %}{% endblock %}
@@ -162,7 +239,7 @@
         </div>
         <div class="chat-messages" id="chatMessages">
             <div class="message assistant">
-                <strong>AI:</strong> Hello! I'm your RentEase AI assistant. How can I help you find the perfect rental property?
+                <strong>AI:</strong> Hello! I'm your RentEase AI assistant. I can help you find rental properties based on location, price, room type, or other preferences. What are you looking for?
             </div>
         </div>
         <div class="chat-input-area">
@@ -176,10 +253,10 @@
     </div>
 
     <!-- Chat Toggle Button -->
-    <button class="btn btn-primary rounded-circle position-fixed" 
-            style="bottom: 20px; right: 20px; width: 60px; height: 60px; z-index: 999;"
+    <button class="btn rounded-circle position-fixed" 
+            style="bottom: 20px; right: 20px; width: 60px; height: 60px; z-index: 999; background-color: var(--navbar-color); border-color: var(--navbar-color); color: white;"
             onclick="toggleChat()">
-        <i class="bi bi-chat-dots" style="font-size: 1.5rem;"></i>
+        <i class="bi bi-robot" style="font-size: 1.5rem;"></i>
     </button>
 
     <!-- Profile Modal -->
@@ -219,10 +296,18 @@
             // Add user message
             const userMsg = document.createElement('div');
             userMsg.className = 'message user';
-            userMsg.innerHTML = `<strong>You:</strong> ${message}`;
+            userMsg.innerHTML = `<strong>You:</strong> ${escapeHtml(message)}`;
             messagesDiv.appendChild(userMsg);
             
             input.value = '';
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+            // Show loading indicator
+            const loadingMsg = document.createElement('div');
+            loadingMsg.className = 'message assistant';
+            loadingMsg.id = 'loadingMsg';
+            loadingMsg.innerHTML = `<strong>AI:</strong> <em>Thinking...</em>`;
+            messagesDiv.appendChild(loadingMsg);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
 
             // Send to API
@@ -235,13 +320,21 @@
             })
             .then(response => response.json())
             .then(data => {
+                // Remove loading message
+                const loading = document.getElementById('loadingMsg');
+                if (loading) loading.remove();
+                
                 const aiMsg = document.createElement('div');
                 aiMsg.className = 'message assistant';
-                aiMsg.innerHTML = `<strong>AI:</strong> ${data.response || data.error || 'Sorry, I encountered an error.'}`;
+                aiMsg.innerHTML = `<strong>AI:</strong> ${escapeHtml(data.response || data.error || 'Sorry, I encountered an error.')}`;
                 messagesDiv.appendChild(aiMsg);
                 messagesDiv.scrollTop = messagesDiv.scrollHeight;
             })
             .catch(error => {
+                // Remove loading message
+                const loading = document.getElementById('loadingMsg');
+                if (loading) loading.remove();
+                
                 const aiMsg = document.createElement('div');
                 aiMsg.className = 'message assistant';
                 aiMsg.innerHTML = `<strong>AI:</strong> Sorry, I encountered an error. Please try again.`;
@@ -405,6 +498,48 @@
             if (!dateString) return 'N/A';
             const date = new Date(dateString);
             return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+        }
+
+        // Shared active booking functions for tenants
+        let globalActiveBookingInfo = null;
+        let globalHasActiveBooking = false;
+
+        async function checkActiveBooking() {
+            try {
+                const response = await fetch('/api/tenant/active-booking');
+                if (response.ok) {
+                    const data = await response.json();
+                    globalHasActiveBooking = data.has_active_booking;
+                    globalActiveBookingInfo = data.booking;
+                    return data;
+                }
+            } catch (error) {
+                console.error('Error checking active booking:', error);
+            }
+            return { has_active_booking: false, booking: null };
+        }
+
+        function displayActiveBookingAlert(alertDivId) {
+            const alertDiv = document.getElementById(alertDivId);
+            if (!alertDiv || !globalActiveBookingInfo) return;
+            
+            alertDiv.innerHTML = `
+                <div class="alert alert-info alert-dismissible fade show" role="alert">
+                    <h5 class="alert-heading">
+                        <i class="bi bi-house-check"></i> You are currently under a property
+                    </h5>
+                    <hr>
+                    <p class="mb-2">
+                        <strong>Property:</strong> ${escapeHtml(globalActiveBookingInfo.property_name)}<br>
+                        <strong>Location:</strong> ${escapeHtml(globalActiveBookingInfo.location)}<br>
+                        <strong>Room Type:</strong> ${escapeHtml(globalActiveBookingInfo.room_type)}<br>
+                        <strong>Monthly Rate:</strong> ₱${parseFloat(globalActiveBookingInfo.monthly_rate).toLocaleString()}<br>
+                        <strong>Start Date:</strong> ${formatDate(globalActiveBookingInfo.start_date)}<br>
+                        ${globalActiveBookingInfo.end_date ? `<strong>End Date:</strong> ${formatDate(globalActiveBookingInfo.end_date)}<br>` : ''}
+                    </p>
+                </div>
+            `;
+            alertDiv.style.display = 'block';
         }
     </script>
     {% block extra_js %}{% endblock %}

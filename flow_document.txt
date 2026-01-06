@@ -1,0 +1,139 @@
+# **RentEase - System Documentation**
+
+## **1. SYSTEM OVERVIEW**
+
+RentEase is a rental property management system with AI-powered assistants. It helps tenants find properties and helps owners manage properties, bookings, and tenants.
+
+### **1.1 Technology Stack**
+- **Backend**: Flask (Python 3.x)
+- **Database**: MySQL/MariaDB
+- **AI Integration**: GroqCloud API (Llama 3.3 70B Versatile)
+- **Frontend**: HTML, JavaScript, Bootstrap 5, DataTables
+- **Authentication**: Session-based with role-based access control
+- **Environment Management**: python-dotenv
+
+### **1.2 Core Features**
+- **Property Management**: Browse, search, and view property details (approved properties only)
+- **AI Chat Assistants**: 
+  - Tenant-side: Property browsing assistant
+  - Owner-side: Analytics and tenant insights assistant
+- **User Management**: 
+  - Account registration with admin approval
+  - Role change requests (tenant → owner)
+  - Profile management
+- **Property Approval System**: Properties require admin approval before being visible
+- **Booking Management**: 
+  - Tenants can create booking requests
+  - Owners can approve/reject bookings
+  - Active booking validation (prevents multiple active bookings)
+- **Owner Dashboard**: 
+  - Property management
+  - Booking management with status updates
+  - Tenant analytics (DataTables)
+  - Financial overview
+  - AI-powered tenant insights
+- **Admin Dashboard**: 
+  - User approval/rejection
+  - Role change request approval
+  - Property approval/rejection
+  - System statistics
+
+---
+
+## **2. USER ROLES & PERMISSIONS**
+
+### **2.1 Guest User (Not Logged In)**
+- Browse properties (only approved properties)
+- View property details
+- Use AI chat for property queries
+- Cannot book rooms
+- Cannot access owner/admin features
+
+### **2.2 Tenant**
+- All guest permissions
+- **Account Management**:
+  - View account profile
+  - Request role change to owner (requires admin approval)
+- **Booking Features**:
+  - Book rooms (if no active booking exists)
+  - View booking status
+  - Submit booking requests with start/end dates
+- **Restrictions**:
+  - Cannot have multiple active bookings simultaneously
+  - Cannot access owner dashboard
+  - Cannot create properties
+
+### **2.3 Owner**
+- All tenant permissions
+- **Dashboard Access**: Full owner dashboard with multiple tabs
+- **Property Management**:
+  - Create properties (requires admin approval)
+  - Add rooms to properties
+  - View property statistics
+- **Booking Management**:
+  - View all bookings for their properties
+  - Approve/reject booking requests
+  - Filter bookings by status
+- **Tenant Management**:
+  - View tenant information in DataTables format
+  - See tenant booking history
+  - View tenant analytics
+- **AI Assistant**: Specialized AI chat for tenant analytics and property insights
+- **Financial Overview**: View revenue, occupancy rates, and financial metrics
+
+### **2.4 Admin**
+- Full system access
+- **User Management**:
+  - Approve/reject new user registrations
+  - Approve/reject role change requests
+  - View all users
+- **Property Management**:
+  - Approve/reject property submissions
+  - View pending properties
+- **System Statistics**: View overall system metrics
+- All owner and tenant permissions
+
+---
+
+## **3. USER FLOWS**
+
+### **3.1 Guest User Flow**
+1. Visit homepage → Browse approved properties
+2. Search properties → Client-side filtering by name/location
+3. View property details → See rooms, amenities, owner info
+4. Use AI chat → Ask questions about available properties
+5. Attempt to book → Redirected to login if not authenticated
+6. Register → Create account (defaults to tenant, requires admin approval)
+7. Login → Access tenant features after approval
+
+### **3.2 Tenant Flow**
+1. Login → Access tenant dashboard
+2. Browse properties → View approved properties with available rooms
+3. Check active booking → System prevents multiple active bookings
+4. Book room → Submit booking request with dates (status: pending)
+5. View account profile → See details, request role change to owner
+6. Use AI chat → Get property recommendations and information
+7. Access messaging → Navigate to messaging page (placeholder)
+
+### **3.3 Owner Flow**
+1. Login → Access owner dashboard
+2. Create property → Submit property for admin approval (status: pending)
+3. Add rooms → Add room details to pending/approved properties
+4. View properties → See all properties with status (approved/pending/rejected)
+5. View bookings → See all booking requests, filter by status
+6. Approve/reject bookings → Update booking status, triggers room availability updates
+7. View tenants → See tenant analytics in DataTables format
+8. Use AI chat → Get analytics and insights about tenants and properties
+9. View financial overview → See revenue, occupancy rates, trends
+
+### **3.4 Admin Flow**
+1. Login → Access admin dashboard
+2. Approve/reject users → Review pending user registrations
+3. Approve/reject role changes → Review tenant-to-owner requests
+4. Approve/reject properties → Review pending property submissions
+5. View system statistics → See overall system metrics
+
+---
+
+This document covers the functional requirements of RentEase. Developers can use it to understand the system features and user capabilities.
+

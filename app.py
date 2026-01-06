@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_from_directory
 from functools import wraps
 import mysql.connector
 from mysql.connector import Error
@@ -8,18 +8,15 @@ from contextlib import contextmanager
 import json
 from datetime import datetime
 import time
-from collections import defaultdict
-import hashlib
 
-# Try to import Google Generative AI (optional)
+# Try to import Groq AI
 try:
-    from google import genai
-    GEMINI_AVAILABLE = True
-except (ImportError, TypeError) as e:
-    print(f"Warning: Google Generative AI not available: {e}")
-    print("AI features will be disabled. Consider using Python 3.11 or 3.12 for full compatibility.")
-    GEMINI_AVAILABLE = False
-    genai = None
+    from groq import Groq
+    GROQ_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: Groq not available: {e}")
+    GROQ_AVAILABLE = False
+    Groq = None
 
 # Load environment variables
 load_dotenv('ai_apis.env')
@@ -36,97 +33,21 @@ DB_CONFIG = {
     'port': int(os.getenv('DB_PORT', 3306))
 }
 
-
-
-# Configure Gemini AI
-ai_client = None
-GEMINI_API_KEY = os.getenv('GOOGLE_API_KEY')
-if GEMINI_AVAILABLE and GEMINI_API_KEY:
+# Configure Groq AI
+groq_client = None
+GROQ_API_KEY = os.getenv('GROQ_API_KEY')
+if GROQ_AVAILABLE and GROQ_API_KEY:
     try:
-        ai_client = genai.Client(api_key=GEMINI_API_KEY)
-        print(f"✓ Gemini AI client initialized successfully (API key length: {len(GEMINI_API_KEY) if GEMINI_API_KEY else 0})")
+        groq_client = Groq(api_key=GROQ_API_KEY)
+        print(f"✓ Groq AI client initialized successfully")
     except Exception as e:
-        print(f"✗ Warning: Failed to configure Gemini AI: {e}")
-        ai_client = None
+        print(f"✗ Warning: Failed to configure Groq AI: {e}")
+        groq_client = None
 else:
-    if not GEMINI_AVAILABLE:
-        print("✗ Gemini AI not available - library import failed")
-    if not GEMINI_API_KEY:
-        print("✗ Gemini AI not configured - GOOGLE_API_KEY not found in environment")
-
-# Rate limiting for AI requests
-class RateLimiter:
-    def __init__(self, max_requests=10, time_window=60, min_delay=2):
-        """
-        Rate limiter for AI API requests
-        max_requests: Maximum requests per time_window (seconds)
-        time_window: Time window in seconds
-        min_delay: Minimum delay between requests in seconds
-        """
-        self.max_requests = max_requests
-        self.time_window = time_window
-        self.min_delay = min_delay
-        self.request_times = defaultdict(list)  # Track requests per user/IP
-        self.last_request_time = {}  # Track last request time per user/IP
-        self.cache = {}  # Simple cache for responses
-        self.cache_ttl = 300  # Cache TTL in seconds (5 minutes)
-    
-    def get_user_id(self, request):
-        """Get unique identifier for rate limiting (user_id or IP)"""
-        if session.get('user_id'):
-            return f"user_{session.get('user_id')}"
-        return f"ip_{request.remote_addr}"
-    
-    def is_allowed(self, user_id):
-        """Check if request is allowed based on rate limits"""
-        now = time.time()
-        
-        # Check minimum delay between requests
-        if user_id in self.last_request_time:
-            time_since_last = now - self.last_request_time[user_id]
-            if time_since_last < self.min_delay:
-                return False, f"Please wait {self.min_delay - int(time_since_last)} seconds before making another request."
-        
-        # Clean old requests outside time window
-        cutoff = now - self.time_window
-        self.request_times[user_id] = [t for t in self.request_times[user_id] if t > cutoff]
-        
-        # Check if under rate limit
-        if len(self.request_times[user_id]) >= self.max_requests:
-            oldest_request = min(self.request_times[user_id])
-            wait_time = int(self.time_window - (now - oldest_request))
-            return False, f"Rate limit exceeded. Please wait {wait_time} seconds before making another request."
-        
-        # Record this request
-        self.request_times[user_id].append(now)
-        self.last_request_time[user_id] = now
-        return True, None
-    
-    def get_cache_key(self, message):
-        """Generate cache key from message"""
-        return hashlib.md5(message.lower().strip().encode()).hexdigest()
-    
-    def get_cached(self, cache_key):
-        """Get cached response if available and not expired"""
-        if cache_key in self.cache:
-            cached_data, cached_time = self.cache[cache_key]
-            if time.time() - cached_time < self.cache_ttl:
-                return cached_data
-            else:
-                # Expired, remove from cache
-                del self.cache[cache_key]
-        return None
-    
-    def set_cached(self, cache_key, response):
-        """Cache a response"""
-        self.cache[cache_key] = (response, time.time())
-        # Clean old cache entries (keep only last 100)
-        if len(self.cache) > 100:
-            oldest_key = min(self.cache.keys(), key=lambda k: self.cache[k][1])
-            del self.cache[oldest_key]
-
-# Initialize rate limiter: 10 requests per 60 seconds, minimum 2 seconds between requests
-ai_rate_limiter = RateLimiter(max_requests=10, time_window=60, min_delay=2)
+    if not GROQ_AVAILABLE:
+        print("✗ Groq not available - library import failed")
+    if not GROQ_API_KEY:
+        print("✗ Groq not configured - GROQ_API_KEY not found in environment")
 
 # Database connection context manager
 @contextmanager
@@ -198,79 +119,6 @@ def format_query_response(results):
     
     return "\n".join(formatted)
 
-def get_minimal_schema():
-    """Returns minimal database schema for AI"""
-    return """users(user_id, full_name, email, phone_number, role, date_registered)
-properties(property_id, owner_id, property_name, description, location, available_rooms, date_posted)
-rooms(room_id, property_id, room_type, available_tenants, monthly_rate, description, total_tenants, current_tenants, house_rules)
-bookings(booking_id, tenant_id, room_id, start_date, end_date, status, created_at)
-payments(payment_id, booking_id, tenant_id, room_id, amount_paid, payment_date, payment_method, status)
-reviews(review_id, tenant_id, room_id, rating, comment, date_posted)"""
-
-def replace_ids_with_names(results):
-    """Replace IDs with human-readable names"""
-    if not results:
-        return results
-    
-    with get_db_cursor() as cursor:
-        # Get all unique IDs
-        user_ids = set()
-        property_ids = set()
-        room_ids = set()
-        
-        for result in results:
-            if 'user_id' in result:
-                user_ids.add(result['user_id'])
-            if 'owner_id' in result:
-                user_ids.add(result['owner_id'])
-            if 'tenant_id' in result:
-                user_ids.add(result['tenant_id'])
-            if 'property_id' in result:
-                property_ids.add(result['property_id'])
-            if 'room_id' in result:
-                room_ids.add(result['room_id'])
-        
-        # Fetch names
-        user_names = {}
-        if user_ids:
-            placeholders = ','.join(['%s'] * len(user_ids))
-            cursor.execute(f"SELECT user_id, full_name FROM users WHERE user_id IN ({placeholders})", list(user_ids))
-            for row in cursor.fetchall():
-                user_names[row['user_id']] = row['full_name']
-        
-        property_names = {}
-        if property_ids:
-            placeholders = ','.join(['%s'] * len(property_ids))
-            cursor.execute(f"SELECT property_id, property_name FROM properties WHERE property_id IN ({placeholders})", list(property_ids))
-            for row in cursor.fetchall():
-                property_names[row['property_id']] = row['property_name']
-        
-        room_info = {}
-        if room_ids:
-            placeholders = ','.join(['%s'] * len(room_ids))
-            cursor.execute(f"""
-                SELECT r.room_id, r.room_type, p.property_name 
-                FROM rooms r 
-                JOIN properties p ON r.property_id = p.property_id 
-                WHERE r.room_id IN ({placeholders})
-            """, list(room_ids))
-            for row in cursor.fetchall():
-                room_info[row['room_id']] = f"{row['property_name']} - {row['room_type']}"
-        
-        # Replace in results
-        for result in results:
-            if 'user_id' in result and result['user_id'] in user_names:
-                result['user_name'] = user_names[result['user_id']]
-            if 'owner_id' in result and result['owner_id'] in user_names:
-                result['owner_name'] = user_names[result['owner_id']]
-            if 'tenant_id' in result and result['tenant_id'] in user_names:
-                result['tenant_name'] = user_names[result['tenant_id']]
-            if 'property_id' in result and result['property_id'] in property_names:
-                result['property_name'] = property_names[result['property_id']]
-            if 'room_id' in result and result['room_id'] in room_info:
-                result['room_name'] = room_info[result['room_id']]
-    
-    return results
 
 # ==================== PUBLIC ROUTES ====================
 
@@ -278,6 +126,11 @@ def replace_ids_with_names(results):
 @app.route('/browse')
 def browse():
     return render_template('browse.html')
+
+@app.route('/imges/<path:filename>')
+def serve_image(filename):
+    """Serve images from the imges folder"""
+    return send_from_directory('imges', filename)
 
 @app.route('/login')
 def login_page():
@@ -421,6 +274,7 @@ def get_room_images(room_id):
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
+    """AI chat endpoint for tenant property browsing using Groq"""
     try:
         data = request.get_json()
         message = data.get('message', '').strip()
@@ -428,116 +282,128 @@ def chat():
         if not message:
             return jsonify({'error': 'Message is required'}), 400
         
-        # Check for identity questions (no rate limit for these)
-        identity_keywords = ['who are you', 'what are you', 'your name', 'your purpose']
-        if any(keyword in message.lower() for keyword in identity_keywords):
+        # Handle simple greetings without API call
+        greetings = ['hi', 'hello', 'hey', 'good morning', 'good afternoon', 'good evening']
+        if message.lower().strip() in greetings:
             return jsonify({
-                'response': "I'm RentEase AI Assistant. I help you find rental properties and answer questions about available rooms, bookings, and more. How can I assist you today?",
+                'response': "Hello! I'm your RentEase AI assistant. I can help you find rental properties based on location, price, room type, or other preferences. What are you looking for?",
                 'timestamp': None
             })
         
-        # Check if Gemini API is configured
-        if not ai_client:
-            print("[AI] Chat request received but ai_client is None - AI not configured")
+        # Check if Groq API is configured
+        if not groq_client:
             return jsonify({
                 'response': 'AI service is not configured. Please contact the administrator.',
                 'timestamp': None
             })
         
-        # Rate limiting check
-        user_id = ai_rate_limiter.get_user_id(request)
-        allowed, error_msg = ai_rate_limiter.is_allowed(user_id)
-        if not allowed:
+        # Fetch property data from database (only approved properties)
+        with get_db_cursor() as cursor:
+            # Get all approved properties with basic info
+            cursor.execute("""
+                SELECT 
+                    p.property_id,
+                    p.property_name,
+                    p.description,
+                    p.location,
+                    u.full_name as owner_name
+                FROM properties p
+                JOIN users u ON p.owner_id = u.user_id
+                WHERE p.deleted_at IS NULL AND p.status = 'approved'
+                ORDER BY p.date_posted DESC
+            """)
+            properties = cursor.fetchall()
+            
+            # Get room information for each property
+            for prop in properties:
+                cursor.execute("""
+                    SELECT 
+                        room_type,
+                        monthly_rate,
+                        available_tenants,
+                        description
+                    FROM rooms
+                    WHERE property_id = %s AND deleted_at IS NULL AND available_tenants > 0
+                    ORDER BY monthly_rate
+                """, (prop['property_id'],))
+                rooms = cursor.fetchall()
+                prop['rooms'] = rooms
+                prop['available_rooms'] = len(rooms)
+        
+        if not properties:
             return jsonify({
-                'response': error_msg,
+                'response': 'No properties are currently available. Please check back later.',
                 'timestamp': None
             })
         
-        # Check cache first
-        cache_key = ai_rate_limiter.get_cache_key(message)
-        cached_response = ai_rate_limiter.get_cached(cache_key)
-        if cached_response:
-            return jsonify(cached_response)
+        # Format property data for AI (compact format to minimize tokens)
+        properties_summary = []
+        for prop in properties:
+            if prop['available_rooms'] > 0:
+                rooms_info = []
+                for room in prop['rooms']:
+                    rooms_info.append(f"{room['room_type']} - ₱{room['monthly_rate']}/month ({room['available_tenants']} available)")
+                
+                properties_summary.append({
+                    'id': prop['property_id'],
+                    'name': prop['property_name'],
+                    'location': prop['location'],
+                    'description': (prop['description'] or 'No description')[:200],  # Limit description length
+                    'available_rooms': prop['available_rooms'],
+                    'rooms': rooms_info
+                })
         
-        # Get minimal schema
-        schema = get_minimal_schema()
-        
-        # Generate SQL query using AI
-        prompt = f"""You are a SQL query generator for a rental property management system.
+        # Create prompt for Groq
+        prompt = f"""You are a helpful AI assistant for RentEase, a rental property platform. Your job is to help tenants find suitable rental properties.
 
-Database Schema:
-{schema}
+Available Properties:
+{json.dumps(properties_summary, indent=2, default=str)}
 
 User Question: {message}
 
-Generate a SQL SELECT query to answer this question. Important rules:
-1. Only generate SELECT queries (no INSERT, UPDATE, DELETE)
-2. Always filter out deleted records using: WHERE deleted_at IS NULL
-3. Use proper JOINs when needed
-4. Return only the SQL query, nothing else
+Instructions:
+1. Answer the user's question about properties based on the data above
+2. Be helpful, friendly, and concise
+3. If the user asks about specific criteria (location, price, room type), recommend matching properties
+4. Mention property IDs when recommending specific properties (users can click on them)
+5. If no properties match, politely say so
+6. Don't make up information not in the data
+7. Keep responses under 200 words
+8. Format your response in a natural, conversational way
 
-SQL Query:"""
+Answer:"""
         
         try:
-            # Single attempt with proper error handling
-            # Use string directly for contents parameter
-            print(f"[AI] Making API call to Gemini for chat query: {message[:50]}...")
-            response = ai_client.models.generate_content(
-                model='gemini-2.0-flash',
-                contents=prompt
+            # Call Groq API
+            response = groq_client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[
+                    {"role": "system", "content": "You are a helpful AI assistant for RentEase, a rental property platform. Help tenants find suitable rental properties."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=500
             )
-            print(f"[AI] API call successful, response received")
-            # Access response text - the response object has a .text attribute
-            sql_query = response.text.strip() if hasattr(response, 'text') and response.text else str(response).strip()
             
-            # Remove markdown code blocks if present
-            if sql_query.startswith('```'):
-                sql_query = sql_query.split('```')[1]
-                if sql_query.startswith('sql'):
-                    sql_query = sql_query[3:]
-                sql_query = sql_query.strip()
+            answer = response.choices[0].message.content.strip()
             
-            # Validate query (SELECT only)
-            if not sql_query.upper().startswith('SELECT'):
-                return jsonify({
-                    'response': 'I can only generate SELECT queries. Please ask about viewing data.',
-                    'timestamp': None
-                })
-            
-            # Execute query
-            with get_db_cursor() as cursor:
-                cursor.execute(sql_query)
-                results = cursor.fetchall()
-            
-            # Replace IDs with names
-            results = replace_ids_with_names(results)
-            
-            # Format response
-            formatted_response = format_query_response(results)
-            
-            response_data = {
-                'response': formatted_response,
+            return jsonify({
+                'response': answer,
                 'timestamp': None
-            }
-            
-            # Cache the response
-            ai_rate_limiter.set_cached(cache_key, response_data)
-            
-            return jsonify(response_data)
+            })
             
         except Exception as e:
             error_str = str(e).lower()
             
-            # Handle rate limit errors specifically
+            # Handle rate limit errors
             if '429' in error_str or 'quota' in error_str or 'rate limit' in error_str:
                 return jsonify({
-                    'response': 'The AI service is currently rate-limited. Please wait a few moments before trying again. You may have reached your API quota limit.',
+                    'response': 'The AI service is currently rate-limited. Please wait a few moments before trying again.',
                     'timestamp': None
                 })
             
-            # Fallback to local formatting if AI fails
             return jsonify({
-                'response': f'I encountered an error processing your request: {str(e)}. Please try rephrasing your question.',
+                'response': f'I encountered an error: {str(e)}. Please try rephrasing your question.',
                 'timestamp': None
             })
     
@@ -591,7 +457,7 @@ def get_user_profile():
 
 @app.route('/api/schema', methods=['GET'])
 def get_schema():
-    return jsonify({'schema': get_minimal_schema()})
+    return jsonify({'schema': 'Database schema endpoint - currently unavailable'})
 
 @app.route('/api/query', methods=['POST'])
 def execute_query():
@@ -1020,9 +886,107 @@ def get_owner_tenants():
     except Error as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/owner/tenants/<int:tenant_id>/bookings', methods=['GET'])
+@require_owner
+def get_tenant_bookings(tenant_id):
+    """Get approved bookings for a specific tenant (for payment form)"""
+    try:
+        owner_id = session.get('user_id')
+        with get_db_cursor() as cursor:
+            # Verify tenant belongs to this owner
+            cursor.execute("""
+                SELECT DISTINCT b.booking_id, b.room_id, b.start_date, b.end_date, b.status,
+                       p.property_name, r.room_type, r.monthly_rate
+                FROM bookings b
+                JOIN rooms r ON b.room_id = r.room_id
+                JOIN properties p ON r.property_id = p.property_id
+                WHERE b.tenant_id = %s 
+                  AND p.owner_id = %s 
+                  AND b.status = 'approved'
+                  AND b.deleted_at IS NULL
+                ORDER BY b.start_date DESC
+            """, (tenant_id, owner_id))
+            bookings = cursor.fetchall()
+            return jsonify(bookings)
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/owner/payments', methods=['POST'])
+@require_owner
+def create_payment():
+    """Create a manual payment entry (owner can manually add payments)"""
+    try:
+        owner_id = session.get('user_id')
+        data = request.get_json()
+        
+        booking_id = data.get('booking_id')
+        tenant_id = data.get('tenant_id')
+        amount_paid = data.get('amount_paid')
+        payment_date = data.get('payment_date')
+        payment_method = data.get('payment_method', 'Manual Entry')
+        status = data.get('status', 'confirmed')  # Default to confirmed for manual entries
+        
+        if not booking_id or not tenant_id or not amount_paid:
+            return jsonify({'error': 'Booking ID, Tenant ID, and Amount are required'}), 400
+        
+        # Validate amount
+        try:
+            amount_paid = float(amount_paid)
+            if amount_paid <= 0:
+                return jsonify({'error': 'Amount must be greater than 0'}), 400
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid amount format'}), 400
+        
+        # Validate payment date or use current date
+        if not payment_date:
+            payment_date = None  # Will use NOW() in SQL
+        
+        with get_db_cursor() as cursor:
+            # Verify booking belongs to this owner
+            cursor.execute("""
+                SELECT b.booking_id, b.room_id, b.tenant_id
+                FROM bookings b
+                JOIN rooms r ON b.room_id = r.room_id
+                JOIN properties p ON r.property_id = p.property_id
+                WHERE b.booking_id = %s 
+                  AND b.tenant_id = %s
+                  AND p.owner_id = %s 
+                  AND b.deleted_at IS NULL
+            """, (booking_id, tenant_id, owner_id))
+            booking = cursor.fetchone()
+            
+            if not booking:
+                return jsonify({'error': 'Booking not found or does not belong to you'}), 404
+            
+            # Get room_id from booking
+            room_id = booking['room_id']
+            
+            # Insert payment
+            if payment_date:
+                cursor.execute("""
+                    INSERT INTO payments (booking_id, tenant_id, room_id, amount_paid, payment_date, payment_method, status)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (booking_id, tenant_id, room_id, amount_paid, payment_date, payment_method, status))
+            else:
+                cursor.execute("""
+                    INSERT INTO payments (booking_id, tenant_id, room_id, amount_paid, payment_method, status)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """, (booking_id, tenant_id, room_id, amount_paid, payment_method, status))
+            
+            payment_id = cursor.lastrowid
+            
+            return jsonify({
+                'success': True,
+                'message': 'Payment added successfully',
+                'payment_id': payment_id
+            })
+    except Error as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/owner/tenant-chat', methods=['POST'])
 @require_owner
 def owner_tenant_chat():
+    """AI tenant chat endpoint using Groq - provides analytics and insights"""
     try:
         data = request.get_json()
         message = data.get('message', '').strip()
@@ -1030,26 +994,46 @@ def owner_tenant_chat():
         if not message:
             return jsonify({'error': 'Message is required'}), 400
         
-        if not ai_client:
-            print("[AI] Owner tenant chat request received but ai_client is None - AI not configured")
+        if not groq_client:
             return jsonify({
                 'response': 'AI service is not configured.',
                 'timestamp': None
             })
         
-        # Rate limiting check
-        user_id = ai_rate_limiter.get_user_id(request)
-        allowed, error_msg = ai_rate_limiter.is_allowed(user_id)
-        if not allowed:
-            return jsonify({
-                'response': error_msg,
-                'timestamp': None
-            })
-        
         owner_id = session.get('user_id')
         
-        # Fetch tenant data
+        # Fetch comprehensive data for the owner
         with get_db_cursor() as cursor:
+            # 1. Key Metrics
+            cursor.execute("""
+                SELECT COUNT(*) as total_properties FROM properties 
+                WHERE owner_id = %s AND deleted_at IS NULL
+            """, (owner_id,))
+            total_properties = cursor.fetchone()['total_properties']
+            
+            cursor.execute("""
+                SELECT COUNT(*) as total_rooms FROM rooms r
+                JOIN properties p ON r.property_id = p.property_id
+                WHERE p.owner_id = %s AND r.deleted_at IS NULL
+            """, (owner_id,))
+            total_rooms = cursor.fetchone()['total_rooms']
+            
+            cursor.execute("""
+                SELECT COUNT(*) as available_rooms FROM rooms r
+                JOIN properties p ON r.property_id = p.property_id
+                WHERE p.owner_id = %s AND r.deleted_at IS NULL AND r.available_tenants > 0
+            """, (owner_id,))
+            available_rooms = cursor.fetchone()['available_rooms']
+            
+            cursor.execute("""
+                SELECT COUNT(*) as pending_bookings FROM bookings b
+                JOIN rooms r ON b.room_id = r.room_id
+                JOIN properties p ON r.property_id = p.property_id
+                WHERE p.owner_id = %s AND b.deleted_at IS NULL AND b.status = 'pending'
+            """, (owner_id,))
+            pending_bookings = cursor.fetchone()['pending_bookings']
+            
+            # 2. Tenant Data
             cursor.execute("""
                 SELECT DISTINCT
                     u.user_id as tenant_id,
@@ -1060,46 +1044,199 @@ def owner_tenant_chat():
                     COUNT(DISTINCT CASE WHEN b.status = 'approved' THEN b.booking_id END) as active_bookings,
                     GROUP_CONCAT(DISTINCT p.property_name SEPARATOR ', ') as properties_rented,
                     GROUP_CONCAT(DISTINCT r.room_type SEPARATOR ', ') as room_types,
-                    AVG(r.monthly_rate) as avg_monthly_rate
+                    AVG(r.monthly_rate) as avg_monthly_rate,
+                    SUM(r.monthly_rate) as total_monthly_revenue
                 FROM users u
                 JOIN bookings b ON u.user_id = b.tenant_id
                 JOIN rooms r ON b.room_id = r.room_id
                 JOIN properties p ON r.property_id = p.property_id
                 WHERE p.owner_id = %s AND b.deleted_at IS NULL AND u.deleted_at IS NULL
                 GROUP BY u.user_id, u.full_name, u.email, u.phone_number
+                ORDER BY u.full_name
             """, (owner_id,))
             tenants = cursor.fetchall()
+            
+            # 3. Property Data with Status
+            cursor.execute("""
+                SELECT 
+                    p.property_id,
+                    p.property_name,
+                    p.location,
+                    p.status,
+                    COUNT(DISTINCT r.room_id) as total_rooms,
+                    COUNT(DISTINCT CASE WHEN r.available_tenants > 0 THEN r.room_id END) as available_rooms,
+                    COUNT(DISTINCT CASE WHEN r.available_tenants = 0 THEN r.room_id END) as occupied_rooms,
+                    COUNT(DISTINCT b.booking_id) as total_bookings,
+                    COUNT(DISTINCT CASE WHEN b.status = 'approved' THEN b.booking_id END) as active_bookings,
+                    COUNT(DISTINCT CASE WHEN b.status = 'pending' THEN b.booking_id END) as pending_bookings,
+                    COALESCE(AVG(rev.rating), 0) as avg_rating
+                FROM properties p
+                LEFT JOIN rooms r ON p.property_id = r.property_id AND r.deleted_at IS NULL
+                LEFT JOIN bookings b ON r.room_id = b.room_id AND b.deleted_at IS NULL
+                LEFT JOIN reviews rev ON r.room_id = rev.room_id
+                WHERE p.owner_id = %s AND p.deleted_at IS NULL
+                GROUP BY p.property_id, p.property_name, p.location, p.status
+                ORDER BY p.property_name
+            """, (owner_id,))
+            properties = cursor.fetchall()
+            
+            # Calculate occupancy rates for properties
+            for prop in properties:
+                if prop['total_rooms'] > 0:
+                    prop['occupancy_rate'] = round((prop['occupied_rooms'] / prop['total_rooms']) * 100, 1)
+                else:
+                    prop['occupancy_rate'] = 0
+                prop['avg_rating'] = round(float(prop['avg_rating']), 1) if prop['avg_rating'] else 0
+            
+            # 4. Financial Data
+            cursor.execute("""
+                SELECT COALESCE(SUM(amount_paid), 0) as total_revenue,
+                       COUNT(*) as total_payments
+                FROM payments p
+                JOIN bookings b ON p.booking_id = b.booking_id
+                JOIN rooms r ON b.room_id = r.room_id
+                JOIN properties prop ON r.property_id = prop.property_id
+                WHERE prop.owner_id = %s AND p.status = 'confirmed'
+            """, (owner_id,))
+            revenue_data = cursor.fetchone()
+            total_revenue = float(revenue_data['total_revenue']) if revenue_data['total_revenue'] else 0
+            
+            cursor.execute("""
+                SELECT COALESCE(SUM(r.monthly_rate), 0) as monthly_expected
+                FROM bookings b
+                JOIN rooms r ON b.room_id = r.room_id
+                JOIN properties p ON r.property_id = p.property_id
+                WHERE p.owner_id = %s AND b.status = 'approved' AND b.deleted_at IS NULL
+            """, (owner_id,))
+            expected_data = cursor.fetchone()
+            monthly_expected = float(expected_data['monthly_expected']) if expected_data['monthly_expected'] else 0
+            
+            # Monthly revenue (last 6 months)
+            cursor.execute("""
+                SELECT DATE_FORMAT(payment_date, '%Y-%m') as month,
+                       SUM(amount_paid) as revenue
+                FROM payments p
+                JOIN bookings b ON p.booking_id = b.booking_id
+                JOIN rooms r ON b.room_id = r.room_id
+                JOIN properties prop ON r.property_id = prop.property_id
+                WHERE prop.owner_id = %s 
+                  AND p.status = 'confirmed'
+                  AND p.payment_date >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+                GROUP BY DATE_FORMAT(payment_date, '%Y-%m')
+                ORDER BY month DESC
+            """, (owner_id,))
+            monthly_revenue = cursor.fetchall()
+            
+            # Revenue by property
+            cursor.execute("""
+                SELECT p.property_name,
+                       COALESCE(SUM(pay.amount_paid), 0) as revenue
+                FROM properties p
+                LEFT JOIN rooms r ON p.property_id = r.property_id
+                LEFT JOIN bookings b ON r.room_id = b.room_id
+                LEFT JOIN payments pay ON b.booking_id = pay.booking_id AND pay.status = 'confirmed'
+                WHERE p.owner_id = %s AND p.deleted_at IS NULL
+                GROUP BY p.property_id, p.property_name
+                ORDER BY revenue DESC
+            """, (owner_id,))
+            revenue_by_property = cursor.fetchall()
+            
+            # 5. Recent Bookings
+            cursor.execute("""
+                SELECT b.*, 
+                       u.full_name as tenant_name, 
+                       u.email as tenant_email,
+                       r.room_type, r.monthly_rate,
+                       p.property_name, p.location
+                FROM bookings b
+                JOIN rooms r ON b.room_id = r.room_id
+                JOIN properties p ON r.property_id = p.property_id
+                JOIN users u ON b.tenant_id = u.user_id
+                WHERE p.owner_id = %s AND b.deleted_at IS NULL
+                ORDER BY b.created_at DESC
+                LIMIT 10
+            """, (owner_id,))
+            recent_bookings = cursor.fetchall()
         
-        if not tenants:
-            return jsonify({
-                'response': 'You don\'t have any tenants yet.',
-                'timestamp': None
-            })
+        # Prepare comprehensive data summary for AI
+        analytics_data = {
+            'summary': {
+                'total_properties': total_properties,
+                'total_rooms': total_rooms,
+                'available_rooms': available_rooms,
+                'occupied_rooms': total_rooms - available_rooms,
+                'occupancy_rate': round(((total_rooms - available_rooms) / total_rooms * 100) if total_rooms > 0 else 0, 1),
+                'pending_bookings': pending_bookings,
+                'total_tenants': len(tenants),
+                'total_revenue': total_revenue,
+                'monthly_expected_revenue': monthly_expected
+            },
+            'tenants': tenants,
+            'properties': properties,
+            'financial': {
+                'total_revenue': total_revenue,
+                'monthly_expected': monthly_expected,
+                'monthly_revenue': monthly_revenue,
+                'revenue_by_property': revenue_by_property
+            },
+            'recent_bookings': recent_bookings
+        }
         
-        # Format tenant data for AI
-        tenant_data = json.dumps(tenants, indent=2, default=str)
-        
-        prompt = f"""You are an AI assistant helping a property owner understand their tenants.
+        # Create prompt for Groq
+        prompt = f"""You are an AI assistant helping a property owner understand their rental business. You have access to comprehensive data about their properties, tenants, bookings, and finances.
 
-Tenant Data (JSON):
-{tenant_data}
+OWNER DATA SUMMARY:
+{json.dumps(analytics_data['summary'], indent=2, default=str)}
+
+TENANTS ({len(tenants)} total):
+{json.dumps(tenants, indent=2, default=str)}
+
+PROPERTIES ({len(properties)} total):
+{json.dumps(properties, indent=2, default=str)}
+
+FINANCIAL DATA:
+{json.dumps(analytics_data['financial'], indent=2, default=str)}
+
+RECENT BOOKINGS (last 10):
+{json.dumps(recent_bookings, indent=2, default=str)}
 
 Owner's Question: {message}
 
-Answer the question using the tenant data provided. Use tenant names, provide statistics, and be helpful and concise.
+Instructions:
+1. Answer the owner's question using the data provided above
+2. Provide analytics, insights, and recommendations based on the data
+3. Use specific numbers, names, and details from the data
+4. If asked for analytics, calculate and present them clearly
+5. If asked about trends, analyze the monthly revenue data
+6. If asked about tenants, use tenant names and provide specific information
+7. If asked about properties, use property names and provide occupancy rates, ratings, etc.
+8. Be helpful, professional, and concise
+9. Format numbers with currency (₱) when appropriate
+10. Keep responses informative but not too long (under 300 words unless specifically asked for detailed analysis)
+11. IMPORTANT FORMATTING: Always format your response with proper line breaks. Use:
+    - Line breaks (\\n) between different sections or topics
+    - Bullet points (- or •) for lists
+    - Numbered lists (1., 2., 3.) for sequential items
+    - Bold text (**text**) for emphasis on key numbers or metrics
+    - Separate paragraphs for different ideas
+    - Use clear headings or section breaks when presenting multiple pieces of information
+    - Never put everything in one long paragraph - break it up for readability
 
 Answer:"""
         
         try:
-            # Use string directly for contents parameter
-            print(f"[AI] Making API call to Gemini for owner tenant chat: {message[:50]}...")
-            response = ai_client.models.generate_content(
-                model='gemini-2.0-flash',
-                contents=prompt
+            # Call Groq API
+            response = groq_client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[
+                    {"role": "system", "content": "You are an AI assistant helping a property owner understand their rental business. Provide analytics, insights, and recommendations based on comprehensive property, tenant, booking, and financial data."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=1000
             )
-            print(f"[AI] API call successful, response received")
-            # Access response text - the response object has a .text attribute
-            answer = response.text.strip() if hasattr(response, 'text') and response.text else str(response).strip()
+            
+            answer = response.choices[0].message.content.strip()
             
             return jsonify({
                 'response': answer,
@@ -1108,7 +1245,7 @@ Answer:"""
         except Exception as e:
             error_str = str(e).lower()
             
-            # Handle rate limit errors specifically
+            # Handle rate limit errors
             if '429' in error_str or 'quota' in error_str or 'rate limit' in error_str:
                 return jsonify({
                     'response': 'The AI service is currently rate-limited. Please wait a few moments before trying again.',

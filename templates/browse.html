@@ -2,25 +2,25 @@
 
 {% block title %}Browse Properties - RentEase{% endblock %}
 
-{% block content %}
-<!-- Active Booking Alert (for tenants) -->
-<div id="activeBookingAlert" style="display: none;"></div>
-
-<div class="row mb-4">
-    <div class="col-12">
-        <h1 class="display-4 mb-3">Find Your Perfect Rental</h1>
-        <p class="lead text-muted">Browse available properties and rooms</p>
+{% block hero_header %}
+<div class="hero-header">
+    <div class="hero-content">
+        <h1 class="hero-title">Find Your Perfect Rental</h1>
     </div>
 </div>
-
-<div class="row mb-4">
-    <div class="col-12">
+<div class="container">
+    <div class="hero-search">
         <div class="input-group input-group-lg">
             <span class="input-group-text"><i class="bi bi-search"></i></span>
-            <input type="text" class="form-control" id="searchInput" placeholder="Search by property name or location...">
+            <input type="text" class="form-control" id="globalSearchInput" placeholder="Search by property name or location...">
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block content %}
+<!-- Active Booking Alert (for tenants) -->
+<div id="activeBookingAlert" style="display: none;"></div>
 
 <div class="row" id="propertiesContainer">
     <div class="col-12 text-center">
@@ -34,53 +34,6 @@
 {% block extra_js %}
 <script>
     let allProperties = [];
-    let hasActiveBooking = false;
-    let activeBookingInfo = null;
-
-    async function checkActiveBooking() {
-        try {
-            const response = await fetch('/api/tenant/active-booking');
-            if (response.ok) {
-                const data = await response.json();
-                hasActiveBooking = data.has_active_booking;
-                activeBookingInfo = data.booking;
-                
-                if (hasActiveBooking) {
-                    displayActiveBookingAlert();
-                }
-            }
-        } catch (error) {
-            console.error('Error checking active booking:', error);
-        }
-    }
-
-    function displayActiveBookingAlert() {
-        const alertDiv = document.getElementById('activeBookingAlert');
-        if (!activeBookingInfo) return;
-        
-        alertDiv.innerHTML = `
-            <div class="alert alert-info alert-dismissible fade show" role="alert">
-                <h5 class="alert-heading">
-                    <i class="bi bi-house-check"></i> You are currently under a property
-                </h5>
-                <hr>
-                <p class="mb-2">
-                    <strong>Property:</strong> ${escapeHtml(activeBookingInfo.property_name)}<br>
-                    <strong>Location:</strong> ${escapeHtml(activeBookingInfo.location)}<br>
-                    <strong>Room Type:</strong> ${escapeHtml(activeBookingInfo.room_type)}<br>
-                    <strong>Monthly Rate:</strong> ₱${parseFloat(activeBookingInfo.monthly_rate).toLocaleString()}<br>
-                    <strong>Start Date:</strong> ${formatDate(activeBookingInfo.start_date)}<br>
-                    ${activeBookingInfo.end_date ? `<strong>End Date:</strong> ${formatDate(activeBookingInfo.end_date)}<br>` : ''}
-                </p>
-                <p class="mb-0">
-                    <small class="text-muted">
-                        <i class="bi bi-info-circle"></i> You cannot book another room while you have an active booking.
-                    </small>
-                </p>
-            </div>
-        `;
-        alertDiv.style.display = 'block';
-    }
 
     async function loadProperties() {
         try {
@@ -106,9 +59,8 @@
         container.innerHTML = properties.map(property => `
             <div class="col-md-6 col-lg-4 mb-4">
                 <div class="card property-card h-100" onclick="viewProperty(${property.property_id})">
-                    <div class="card-img-top bg-secondary d-flex align-items-center justify-content-center" 
-                         style="height: 200px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-                        <i class="bi bi-house-door text-white" style="font-size: 4rem;"></i>
+                    <div class="card-img-top" 
+                         style="height: 200px; background-image: url('/imges/bhouse.jpg'); background-size: cover; background-position: center; background-repeat: no-repeat;">
                     </div>
                     <div class="card-body">
                         <h5 class="card-title">${escapeHtml(property.property_name)}</h5>
@@ -136,39 +88,34 @@
     }
 
     function viewProperty(propertyId) {
-        if (hasActiveBooking) {
+        if (globalHasActiveBooking) {
             alert('You already have an active booking. You cannot view or book other properties.');
             return;
         }
         window.location.href = `/property/${propertyId}`;
     }
 
-    function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
 
-    function formatDate(dateString) {
-        if (!dateString) return '';
-        const date = new Date(dateString);
-        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    // Search functionality - connect to global search input
+    const searchInput = document.getElementById('globalSearchInput') || document.getElementById('searchInput');
+    if (searchInput) {
+        searchInput.addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            const filtered = allProperties.filter(property => 
+                property.property_name.toLowerCase().includes(searchTerm) ||
+                property.location.toLowerCase().includes(searchTerm) ||
+                (property.description && property.description.toLowerCase().includes(searchTerm))
+            );
+            displayProperties(filtered);
+        });
     }
-
-    // Search functionality
-    document.getElementById('searchInput').addEventListener('input', function(e) {
-        const searchTerm = e.target.value.toLowerCase();
-        const filtered = allProperties.filter(property => 
-            property.property_name.toLowerCase().includes(searchTerm) ||
-            property.location.toLowerCase().includes(searchTerm) ||
-            (property.description && property.description.toLowerCase().includes(searchTerm))
-        );
-        displayProperties(filtered);
-    });
 
     // Load properties and check active booking on page load
     {% if session.logged_in and session.role == 'tenant' %}
     checkActiveBooking().then(() => {
+        if (globalHasActiveBooking) {
+            displayActiveBookingAlert('activeBookingAlert');
+        }
         loadProperties();
     });
     {% else %}
